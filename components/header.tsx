@@ -132,29 +132,32 @@ export function Header() {
   }
 
   return (
-    <header className="h-14 border-b border-border px-4 flex items-center justify-between bg-background relative">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <header className="h-14 md:h-16 border-b border-border px-2 md:px-4 flex items-center justify-between bg-background relative gap-2">
+      {/* Search bar - reduced width on mobile */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="relative w-full max-w-xs md:max-w-md flex-1">
+          <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search emails..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-muted/50"
+            className="pl-9 md:pl-10 bg-muted/50 h-9 md:h-10 text-sm"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 relative">
+      {/* Header buttons - compact on mobile */}
+      <div className="flex items-center gap-1 md:gap-2">
         {/* Theme toggle */}
         <Button
           variant="ghost"
           size="icon"
+          className="h-8 w-8 md:h-9 md:w-9"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           title="Toggle theme"
         >
-          <Sun className="h-5 w-5 dark:hidden" />
-          <Moon className="h-5 w-5 hidden dark:block" />
+          <Sun className="h-4 w-4 md:h-5 md:w-5 dark:hidden" />
+          <Moon className="h-4 w-4 md:h-5 md:w-5 hidden dark:block" />
         </Button>
 
         {/* Auto-sync toggle */}
@@ -162,11 +165,11 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => setShowAutoSync(!showAutoSync)}
             title="Auto-sync settings"
-            className={autoSyncEnabled ? "text-green-600" : ""}
           >
-            <Clock className="h-5 w-5" />
+            <Clock className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           {showAutoSync && (
             <div className="absolute right-0 top-full mt-2 w-64 bg-background border border-border rounded-lg shadow-lg p-4 z-50">
@@ -205,30 +208,30 @@ export function Header() {
         </div>
 
         {/* Manual sync button */}
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleSync}
-            disabled={isSyncing || autoSyncEnabled}
-            title="Sync emails"
-          >
-            {isSyncing ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 md:h-9 md:w-9"
+          onClick={handleSync}
+          disabled={isSyncing || autoSyncEnabled}
+          title="Sync emails"
+        >
+          {isSyncing ? (
+            <RefreshCw className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 md:h-5 md:w-5" />
+          )}
+        </Button>
 
         {/* Notifications */}
         <div className="relative">
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => setShowNotifications(!showNotifications)}
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           {showNotifications && (
             <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-lg shadow-lg p-4 z-50">
@@ -264,10 +267,10 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => setShowUserMenu(!showUserMenu)}
           >
-            <User className="h-5 w-5" />
-            <ChevronDown className="h-3 w-3 ml-1" />
+            <User className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           {showUserMenu && (
             <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-border rounded-lg shadow-lg py-2 z-50">

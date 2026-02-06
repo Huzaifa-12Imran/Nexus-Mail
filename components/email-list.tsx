@@ -308,12 +308,13 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Header controls */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-2 md:px-4 py-2 border-b border-border gap-2">
+        <div className="flex items-center gap-1 md:gap-2 overflow-x-auto">
           <Button
             variant={currentTab === "all" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setCurrentTab("all")}
+            className="text-xs md:text-sm"
           >
             All
           </Button>
@@ -321,6 +322,7 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
             variant={currentTab === "unread" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setCurrentTab("unread")}
+            className="text-xs md:text-sm"
           >
             Unread
           </Button>
@@ -328,16 +330,17 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
             variant="ghost"
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
-            className={showFilters ? "bg-muted" : ""}
+            className={cn(showFilters ? "bg-muted" : "", "text-xs md:text-sm")}
           >
-            <Filter className="h-4 w-4 mr-1" />
-            Filters
+            <Filter className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1" />
+            <span className="hidden sm:inline">Filters</span>
           </Button>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={syncEmails}
             disabled={isSyncing}
           >
@@ -352,22 +355,24 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
 
       {/* Bulk actions toolbar - appears before filters for better visibility */}
       {showBulkActions && (
-        <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground border-b border-primary shadow-sm">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 px-2 md:px-4 py-2 bg-primary text-primary-foreground border-b border-primary shadow-sm">
           <span className="text-sm font-medium">
             {selectedEmails.length} selected
           </span>
-          <Button variant="secondary" size="sm" onClick={bulkMarkAsRead}>
-            <MailOpen className="h-4 w-4 mr-1" />
-            Mark read
-          </Button>
-          <Button variant="secondary" size="sm" onClick={bulkArchive}>
-            <Archive className="h-4 w-4 mr-1" />
-            Archive
-          </Button>
-          <Button variant="destructive" size="sm" onClick={bulkDelete}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete
-          </Button>
+          <div className="flex flex-wrap gap-1 md:gap-2">
+            <Button variant="secondary" size="sm" onClick={bulkMarkAsRead}>
+              <MailOpen className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1" />
+              <span className="hidden sm:inline">Mark read</span>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={bulkArchive}>
+              <Archive className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1" />
+              <span className="hidden sm:inline">Archive</span>
+            </Button>
+            <Button variant="destructive" size="sm" onClick={bulkDelete}>
+              <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+          </div>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -375,37 +380,37 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
               setSelectedEmails([])
               setShowBulkActions(false)
             }}
-            className="ml-auto hover:bg-primary-foreground/20"
+            className="ml-auto hover:bg-primary-foreground/20 text-xs md:text-sm"
           >
-            Clear selection
+            Clear
           </Button>
         </div>
       )}
 
       {/* Filters panel */}
       {showFilters && (
-        <div className="px-4 py-3 border-b border-border bg-muted/30">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="w-48">
-              <label className="text-xs text-muted-foreground">From (sender)</label>
+        <div className="px-2 md:px-4 py-3 border-b border-border bg-muted/30">
+          <div className="flex flex-wrap gap-2 md:gap-3 items-end">
+            <div className="w-full sm:w-36 md:w-48">
+              <label className="text-xs text-muted-foreground hidden sm:block">From (sender)</label>
               <Input
-                placeholder="Search sender..."
+                placeholder="Sender..."
                 value={filterSender}
                 onChange={(e) => setFilterSender(e.target.value)}
-                className="h-8"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="w-48">
-              <label className="text-xs text-muted-foreground">Subject</label>
+            <div className="w-full sm:w-36 md:w-48">
+              <label className="text-xs text-muted-foreground hidden sm:block">Subject</label>
               <Input
-                placeholder="Search subject..."
+                placeholder="Subject..."
                 value={filterSubject}
                 onChange={(e) => setFilterSubject(e.target.value)}
-                className="h-8"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="w-36">
-              <label className="text-xs text-muted-foreground">Date</label>
+            <div className="w-28 md:w-36">
+              <label className="text-xs text-muted-foreground hidden md:block">Date</label>
               <select
                 value={filterDateRange}
                 onChange={(e) =>
@@ -494,34 +499,34 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
               </Button>
               <Link
                 href={`/email/${email.id}`}
-                className="flex-1 min-w-0 flex items-center gap-24 overflow-hidden"
+                className="flex-1 min-w-0 flex items-center gap-2 md:gap-24 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div
                   className={cn(
-                    "min-w-0 flex-shrink-0 w-36",
+                    "min-w-0 flex-shrink-0 w-24 md:w-36",
                     !email.isRead && "font-semibold"
                   )}
                 >
-                  <span className="truncate text-sm">{email.from}</span>
+                  <span className="truncate text-xs md:text-sm">{email.from}</span>
                 </div>
                 <div className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
-                  <span className={cn("truncate text-sm", !email.isRead && "font-medium")}>
+                  <span className={cn("truncate text-xs md:text-sm", !email.isRead && "font-medium")}>
                     {email.subject}
                   </span>
-                  <span className="text-muted-foreground text-xs truncate flex-shrink-0">
+                  <span className="text-muted-foreground text-xs truncate flex-shrink-0 hidden xs:block">
                     - {email.snippet}
                   </span>
                 </div>
                 {email.category && (
                   <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    className="w-2 h-2 rounded-full flex-shrink-0 hidden sm:block"
                     style={{ backgroundColor: email.category.color || "#888" }}
                   />
                 )}
               </Link>
               <div 
-                className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 cursor-help relative"
+                className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 cursor-help relative ml-auto"
                 onMouseEnter={() => setHoveredDate(email.id)}
                 onMouseLeave={() => setHoveredDate(null)}
               >
