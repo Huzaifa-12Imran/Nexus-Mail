@@ -311,10 +311,11 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
       <div className="flex items-center justify-between px-2 md:px-4 py-2 border-b border-border gap-2">
         <div className="flex items-center gap-2">
           {/* Mobile menu button */}
+          {/* Mobile menu button */}
           <Button
             variant="outline"
             size="icon"
-            className="lg:hidden h-8 w-8"
+            className="md:hidden h-8 w-8"
             onClick={() => {
               localStorage.setItem("sidebarOpen", "true")
               window.dispatchEvent(new Event("storage"))
@@ -349,6 +350,7 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
             <span className="hidden sm:inline">Filters</span>
           </Button>
         </div>
+      </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"

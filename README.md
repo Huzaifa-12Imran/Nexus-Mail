@@ -34,17 +34,6 @@ This app uses the following Nylas API features:
   - `email.read` - Read emails
   - `email.write` - Send and modify emails
 
-### Calendar API
-- **Purpose**: Event scheduling and management
-- **Scopes required**:
-  - `calendar.read` - Read events
-  - `calendar.write` - Create and modify events
-
-### Contacts API
-- **Purpose**: CRM contact management
-- **Scopes required**:
-  - `contacts.read` - Read contacts
-  - `contacts.write` - Create and modify contacts
 
 ### Provider Options
 When connecting email accounts, the app supports:

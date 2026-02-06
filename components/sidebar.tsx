@@ -12,8 +12,6 @@ import {
   Trash2,
   AlertCircle,
   Settings,
-  Menu,
-  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -34,7 +32,7 @@ interface UnreadCounts {
 export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
   const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({ inbox: 0 })
-  const [isMobileOpen, setIsMobileOpen] = useState(isOpen)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   useEffect(() => {
     fetchUnreadCounts()
@@ -79,20 +77,10 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
 
   return (
     <>
-      {/* Mobile menu button - visible only on mobile */}
-      <Button
-        variant="outline"
-        size="icon"
-        className="lg:hidden fixed top-4 left-4 z-50 bg-background border"
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </Button>
-
       {/* Mobile overlay */}
       {isMobileOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-30"
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
           onClick={handleLinkClick}
         />
       )}
@@ -100,15 +88,15 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
       {/* Sidebar */}
       <aside 
         className={cn(
-          "bg-muted/30 border-r border-border flex flex-col h-full fixed lg:relative z-40 transition-transform duration-300",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          "bg-muted border-r border-border flex flex-col h-full fixed md:relative z-40 transition-transform duration-300",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           "w-64"
         )}
       >
-        <div className="p-4 pt-16 md:pt-4">
+        <div className="p-4">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <span className="text-2xl">📧</span>
-            <span className="hidden sm:inline">Nexus Mail</span>
+            <span>Nexus Mail</span>
           </h1>
         </div>
 
@@ -144,32 +132,32 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
 
         <div className="p-4 border-t border-border">
           <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground px-3 hidden sm:block">
+            <div className="text-xs font-medium px-3 text-foreground">
               CATEGORIES
             </div>
             <Link
               href="/category/primary"
               onClick={handleLinkClick}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted"
             >
               <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="hidden sm:inline">Primary</span>
+              <span>Primary</span>
             </Link>
             <Link
               href="/category/social"
               onClick={handleLinkClick}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted"
             >
               <span className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="hidden sm:inline">Social</span>
+              <span>Social</span>
             </Link>
             <Link
               href="/category/promotions"
               onClick={handleLinkClick}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted"
             >
               <span className="w-2 h-2 rounded-full bg-yellow-500" />
-              <span className="hidden sm:inline">Promotions</span>
+              <span>Promotions</span>
             </Link>
           </div>
         </div>
@@ -178,7 +166,7 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
           <Link href="/connect" onClick={handleLinkClick}>
             <Button variant="outline" className="w-full justify-start gap-2">
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
+              <span>Settings</span>
             </Button>
           </Link>
         </div>
