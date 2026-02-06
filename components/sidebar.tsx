@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -11,21 +12,43 @@ import {
   Trash2,
   AlertCircle,
   Settings,
-  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navigation = [
-  { name: "Inbox", href: "/", icon: Inbox },
-  { name: "Starred", href: "/starred", icon: Star },
-  { name: "Sent", href: "/sent", icon: Send },
-  { name: "Drafts", href: "/drafts", icon: File },
-  { name: "Spam", href: "/spam", icon: AlertCircle },
-  { name: "Trash", href: "/trash", icon: Trash2 },
+  { name: "Inbox", href: "/", icon: Inbox, folder: "inbox" },
+  { name: "Starred", href: "/starred", icon: Star, folder: "starred" },
+  { name: "Sent", href: "/sent", icon: Send, folder: "sent" },
+  { name: "Drafts", href: "/drafts", icon: File, folder: "drafts" },
+  { name: "Spam", href: "/spam", icon: AlertCircle, folder: "spam" },
+  { name: "Trash", href: "/trash", icon: Trash2, folder: "trash" },
 ]
+
+interface UnreadCounts {
+  inbox: number
+  [key: string]: number
+}
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({ inbox: 0 })
+
+  useEffect(() => {
+    fetchUnreadCounts()
+  }, [])
+
+  const fetchUnreadCounts = async () => {
+    try {
+      const response = await fetch("/api/emails?unread=true")
+      if (response.ok) {
+        const data = await response.json()
+        // Get unread count for inbox
+        setUnreadCounts({ inbox: data.emails?.length || 0 })
+      }
+    } catch (error) {
+      console.error("Error fetching unread counts:", error)
+    }
+  }
 
   return (
     <aside className="w-64 bg-muted/30 border-r border-border flex flex-col h-full">
@@ -35,10 +58,13 @@ export function Sidebar() {
           Nexus Mail
         </h1>
       </div>
-      
+
       <nav className="flex-1 px-2 space-y-1">
         {navigation.map((item) => {
           const isActive = pathname === item.href
+          const unreadCount = unreadCounts[item.folder] || 0
+          const showBadge = unreadCount > 0 && item.name === "Inbox"
+
           return (
             <Link
               key={item.name}
@@ -52,6 +78,11 @@ export function Sidebar() {
             >
               <item.icon className="h-5 w-5" />
               {item.name}
+              {showBadge && (
+                <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           )
         })}
