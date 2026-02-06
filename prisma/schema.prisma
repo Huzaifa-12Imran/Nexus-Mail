@@ -23,6 +23,9 @@ model User {
   sessions      UserSession[]
   contacts      Contact[]
   events        Event[]
+  snoozedEmails SnoozedEmail[]
+  reminders     EmailReminder[]
+  prioritySenders PrioritySender[]
 }
 
 model Account {
@@ -340,4 +343,79 @@ model Note {
 
   @@index([userId])
   @@index([title])
+}
+
+// ============================================================================
+// EMAIL SNOOZE
+// ============================================================================
+
+model SnoozedEmail {
+  id          String   @id @default(cuid())
+  userId      String
+  emailId     String
+  
+  // Snooze details
+  snoozeUntil DateTime
+  folder      String   @default("inbox") // inbox, primary, social, promotions
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([emailId])
+  @@index([snoozeUntil])
+}
+
+// ============================================================================
+// EMAIL REMINDERS
+// ============================================================================
+
+model EmailReminder {
+  id          String   @id @default(cuid())
+  userId      String
+  emailId     String?
+  
+  // Reminder details
+  title       String
+  message     String?  @db.Text
+  remindAt    DateTime
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  
+  // Notification
+  notified    Boolean  @default(false)
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([emailId])
+  @@index([remindAt])
+  @@index([isCompleted])
+}
+
+// ============================================================================
+// PRIORITY SENDERS
+// ============================================================================
+
+model PrioritySender {
+  id          String   @id @default(cuid())
+  userId      String
+  email       String
+  name        String?
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, email])
+  @@index([userId])
 }

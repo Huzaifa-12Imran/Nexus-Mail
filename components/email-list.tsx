@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Star, Archive, Trash2, Mail, MailOpen, RefreshCw, Loader2, Filter, X, Menu } from "lucide-react"
+import { Star, Archive, Trash2, Mail, MailOpen, RefreshCw, Loader2, Filter, X, Menu, Bell, Clock } from "lucide-react"
 import { cn, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
+import { SnoozeModal } from "@/components/snooze-modal"
+import { ReminderModal } from "@/components/reminder-modal"
 
 interface Email {
   id: string
@@ -41,6 +43,10 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
   const [filterSubject, setFilterSubject] = useState("")
   const [filterDateRange, setFilterDateRange] = useState<"all" | "today" | "week" | "month">("all")
   const [hoveredDate, setHoveredDate] = useState<string | null>(null)
+  const [hoveredEmail, setHoveredEmail] = useState<string | null>(null)
+  const [showSnoozeModal, setShowSnoozeModal] = useState(false)
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [selectedEmailForAction, setSelectedEmailForAction] = useState<Email | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -321,6 +327,54 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
     }
   }
 
+  const handleSnooze = async (snoozeUntil: string) => {
+    if (!selectedEmailForAction) return
+    try {
+      await fetch(`/api/emails/${selectedEmailForAction.id}/snooze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snoozeUntil }),
+      })
+      setEmails((prev) => prev.filter((em) => em.id !== selectedEmailForAction.id))
+      setShowSnoozeModal(false)
+      setSelectedEmailForAction(null)
+      toast({ title: "Email snoozed", description: "The email will return at the specified time" })
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to snooze email", variant: "destructive" })
+    }
+  }
+
+  const handleSetReminder = async (reminder: { title: string; message?: string; remindAt: string }) => {
+    if (!selectedEmailForAction) return
+    try {
+      await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailId: selectedEmailForAction.id,
+          title: reminder.title,
+          message: reminder.message,
+          remindAt: reminder.remindAt,
+        }),
+      })
+      setShowReminderModal(false)
+      setSelectedEmailForAction(null)
+      toast({ title: "Reminder set", description: "You will be reminded about this email" })
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to set reminder", variant: "destructive" })
+    }
+  }
+
+  const openSnoozeModal = (email: Email) => {
+    setSelectedEmailForAction(email)
+    setShowSnoozeModal(true)
+  }
+
+  const openReminderModal = (email: Email) => {
+    setSelectedEmailForAction(email)
+    setShowReminderModal(true)
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Header controls */}
@@ -491,11 +545,13 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
             <div
               key={email.id}
               className={cn(
-                "flex items-center gap-2 px-3 py-1.5 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors",
+                "flex items-center gap-2 px-3 py-1.5 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors group",
                 !email.isRead && "bg-primary/5",
                 selectedEmails.includes(email.id) && "bg-primary/10 border-l-2 border-l-primary"
               )}
               onClick={() => markAsRead(email.id)}
+              onMouseEnter={() => setHoveredEmail(email.id)}
+              onMouseLeave={() => setHoveredEmail(null)}
             >
               <Checkbox
                 checked={selectedEmails.includes(email.id)}
@@ -528,6 +584,38 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
+              {/* Snooze button - always visible on hover */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground/50 hover:text-blue-600 transition-opacity",
+                  hoveredEmail === email.id ? "opacity-100" : "opacity-0"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openSnoozeModal(email)
+                }}
+                title="Snooze"
+              >
+                <Clock className="h-3.5 w-3.5" />
+              </Button>
+              {/* Reminder button - always visible on hover */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground/50 hover:text-green-600 transition-opacity",
+                  hoveredEmail === email.id ? "opacity-100" : "opacity-0"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openReminderModal(email)
+                }}
+                title="Set reminder"
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </Button>
               <Link
                 href={`/email/${email.id}`}
                 className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden"
@@ -559,6 +647,33 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
           ))
         )}
       </div>
+
+      {/* Snooze Modal */}
+      {selectedEmailForAction && (
+        <SnoozeModal
+          isOpen={showSnoozeModal}
+          onClose={() => {
+            setShowSnoozeModal(false)
+            setSelectedEmailForAction(null)
+          }}
+          emailId={selectedEmailForAction.id}
+          onSnooze={handleSnooze}
+        />
+      )}
+
+      {/* Reminder Modal */}
+      {selectedEmailForAction && (
+        <ReminderModal
+          isOpen={showReminderModal}
+          onClose={() => {
+            setShowReminderModal(false)
+            setSelectedEmailForAction(null)
+          }}
+          emailId={selectedEmailForAction.id}
+          emailSubject={selectedEmailForAction.subject}
+          onCreateReminder={handleSetReminder}
+        />
+      )}
     </div>
   )
 }

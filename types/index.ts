@@ -223,6 +223,69 @@ export interface Note {
 }
 
 // ============================================================================
+// EMAIL SNOOZE TYPES
+// ============================================================================
+
+export interface SnoozedEmail {
+  id: string
+  userId: string
+  emailId: string
+  snoozeUntil: Date
+  folder: 'inbox' | 'primary' | 'social' | 'promotions'
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type SnoozeOption = 
+  | { type: 'today'; time: string }
+  | { type: 'tomorrow'; time: string }
+  | { type: 'nextWeek'; dayOfWeek: number }
+  | { type: 'custom'; date: string; time: string }
+
+// ============================================================================
+// EMAIL REMINDER TYPES
+// ============================================================================
+
+export interface EmailReminder {
+  id: string
+  userId: string
+  emailId?: string
+  title: string
+  message?: string
+  remindAt: Date
+  isCompleted: boolean
+  completedAt?: Date
+  notified: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface CreateReminderRequest {
+  emailId?: string
+  title: string
+  message?: string
+  remindAt: string
+}
+
+// ============================================================================
+// PRIORITY SENDER TYPES
+// ============================================================================
+
+export interface PrioritySender {
+  id: string
+  userId: string
+  email: string
+  name?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface CreatePrioritySenderRequest {
+  email: string
+  name?: string
+}
+
+// ============================================================================
 // API REQUEST/RESPONSE TYPES
 // ============================================================================
 
@@ -271,4 +334,9 @@ export interface CreateContactRequest {
   }
   notes?: string
   groups?: string[]
+}
+
+export interface SnoozeEmailRequest {
+  snoozeUntil: string
+  folder?: 'inbox' | 'primary' | 'social' | 'promotions'
 }

@@ -90,12 +90,22 @@ export async function GET(request: Request) {
 
     // Handle category filter
     if (category && category !== "all") {
-      // Primary shows uncategorized emails too (default)
+      // Primary shows only emails from priority senders
       if (category === "primary") {
-        whereClause.OR = [
-          { category: { name: "Primary" } },
-          { category: null },
-        ]
+        // Get priority sender emails
+        const prioritySenders = await prisma.prioritySender.findMany({
+          where: { userId },
+          select: { email: true },
+        })
+        const priorityEmails = prioritySenders.map(ps => ps.email)
+        
+        if (priorityEmails.length > 0) {
+          // Filter by priority sender emails
+          whereClause.fromEmail = { in: priorityEmails }
+        } else {
+          // No priority senders set, show empty
+          whereClause.id = "none"
+        }
       } else {
         // Other categories only show matched category
         whereClause.category = { name: category }

@@ -13,6 +13,9 @@ import {
   AlertCircle,
   Settings,
   Mail,
+  Clock,
+  Bell,
+  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -23,6 +26,9 @@ const navigation = [
   { name: "Drafts", href: "/drafts", icon: File, folder: "drafts" },
   { name: "Spam", href: "/spam", icon: AlertCircle, folder: "spam" },
   { name: "Trash", href: "/trash", icon: Trash2, folder: "trash" },
+  { name: "Snoozed", href: "/snoozed", icon: Clock, folder: "snoozed" },
+  { name: "Reminders", href: "/reminders", icon: Bell, folder: "" },
+  { name: "Priority Senders", href: "/priority-senders", icon: User, folder: "" },
   { name: "Connections", href: "/connections", icon: Mail, folder: "" },
 ]
 
