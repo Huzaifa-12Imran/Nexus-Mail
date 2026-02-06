@@ -49,14 +49,15 @@ model EmailConnection {
   userId          String
   emailAddress    String
   provider        String   // gmail, outlook, etc.
-  grantId         String?  // Nylas grant ID
-  accessToken     String   @db.Text
-  refreshToken    String?  @db.Text
+  grantId         String?   // Nylas grant ID (set after callback)
+  accessToken     String?   @db.Text // Not used in v3 ECC
+  refreshToken    String?   @db.Text // Not used in v3 ECC
   expiresAt       DateTime?
   scope           String?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isActive        Boolean   @default(true)
+  state           String?   // For OAuth state validation
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   emails  Email[]

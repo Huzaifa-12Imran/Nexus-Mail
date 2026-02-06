@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const folder = searchParams.get("folder")
     const unread = searchParams.get("unread")
     const search = searchParams.get("search")
+    const connectionId = searchParams.get("connectionId")
     const limit = parseInt(searchParams.get("limit") || "50")
     const offset = parseInt(searchParams.get("offset") || "0")
 
@@ -59,6 +60,11 @@ export async function GET(request: Request) {
     const whereClause: Record<string, unknown> = {
       userId,
       isDeleted: false,
+    }
+
+    // Filter by connection if provided
+    if (connectionId) {
+      whereClause.connectionId = connectionId
     }
 
     // Handle folder filters
@@ -125,15 +131,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { to, cc, bcc, subject, body: emailBody, threadId } = body
+    const { to, cc, bcc, subject, body: emailBody, threadId, connectionId } = body
 
-    // Get user's email connection
-    const connection = await prisma.emailConnection.findFirst({
-      where: {
-        userId: user.id,
-        isActive: true,
-      },
-    })
+    // Get user's email connection (use selected connection or first active)
+    const connection = connectionId
+      ? await prisma.emailConnection.findFirst({
+          where: { id: connectionId, userId: user.id },
+        })
+      : await prisma.emailConnection.findFirst({
+          where: { userId: user.id, isActive: true },
+        })
 
     if (!connection) {
       return NextResponse.json(
@@ -142,15 +149,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Send email via Nylas
-    if (!connection.grantId) {
-      return NextResponse.json(
-        { error: "Email connection not fully authenticated. Please reconnect your account." },
-        { status: 400 }
-      )
-    }
+    // For Nylas v3, the connection.id IS the grantId
+    const grantId = connection.grantId || connection.id
     
-    const result = await nylasClient.sendEmail(connection.grantId, {
+    const result = await nylasClient.sendEmail(grantId, {
       from: { email: connection.emailAddress },
       to: Array.isArray(to) ? to.map((e: string) => ({ email: e })) : [{ email: to }],
       cc: cc ? (Array.isArray(cc) ? cc.map((e: string) => ({ email: e })) : [{ email: cc }]) : undefined,

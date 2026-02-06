@@ -9,16 +9,57 @@ export async function GET(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      // Fallback to getSession
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      }
-      var userId = session.user.id
-    } else {
-      var userId = user.id
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const userId = user.id
+
+    // First, sync Nylas grants to database
+    try {
+      const grants = await nylasClient.listGrants()
+      
+      for (const grant of grants) {
+        // Check if connection already exists for this user with this email
+        const existing = await prisma.emailConnection.findFirst({
+          where: {
+            OR: [
+              { id: grant.id },
+              { emailAddress: grant.email },
+            ],
+          },
+        })
+        
+        if (existing) {
+          // Update existing connection
+          await prisma.emailConnection.update({
+            where: { id: existing.id },
+            data: {
+              emailAddress: grant.email,
+              provider: grant.provider,
+              isActive: grant.grant_status === 'valid',
+              updatedAt: new Date(),
+            },
+          })
+        } else {
+          // Create new connection
+          await prisma.emailConnection.create({
+            data: {
+              id: grant.id,
+              userId,
+              emailAddress: grant.email,
+              provider: grant.provider,
+              accessToken: '',
+              isActive: grant.grant_status === 'valid',
+            },
+          })
+        }
+      }
+    } catch (syncError) {
+      console.error('Error syncing Nylas grants:', syncError)
+      // Continue even if sync fails - return existing connections
+    }
+
+    // Return connections from database
     const connections = await prisma.emailConnection.findMany({
       where: { userId },
       select: {

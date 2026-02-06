@@ -47,6 +47,16 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
     fetchEmails()
   }, [currentTab, folder, category])
 
+  // Listen for account switching from header
+  useEffect(() => {
+    const handleStorageChange = () => {
+      fetchEmails()
+    }
+    
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
+
   useEffect(() => {
     applyFilters()
   }, [emails, filterSender, filterSubject, filterDateRange])
@@ -58,6 +68,12 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
       if (currentTab === "unread") params.append("unread", "true")
       if (folder) params.append("folder", folder)
       if (category) params.append("category", category)
+
+      // Get selected connection from localStorage
+      const selectedConnectionId = localStorage.getItem("selectedConnectionId")
+      if (selectedConnectionId) {
+        params.append("connectionId", selectedConnectionId)
+      }
 
       const response = await fetch(`/api/emails?${params.toString()}`)
       if (response.ok) {

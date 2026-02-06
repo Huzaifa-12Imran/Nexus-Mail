@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Bell, User, Sparkles, LogOut, Settings, ChevronDown, RefreshCw, Clock, Sun, Moon } from "lucide-react"
+import { Search, Bell, User, Sparkles, LogOut, Settings, ChevronDown, RefreshCw, Clock, Sun, Moon, Mail } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
+import { cn } from "@/lib/utils"
 
 const SYNC_INTERVALS = [
   { label: "1 minute", value: 60000 },
@@ -14,11 +15,21 @@ const SYNC_INTERVALS = [
   { label: "10 minutes", value: 600000 },
 ]
 
+interface Connection {
+  id: string
+  emailAddress: string
+  provider: string
+  isActive: boolean
+}
+
 export function Header() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAutoSync, setShowAutoSync] = useState(false)
+  const [showEmailMenu, setShowEmailMenu] = useState(false)
+  const [connections, setConnections] = useState<Connection[]>([])
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
   const [autoSyncInterval, setAutoSyncInterval] = useState(300000)
@@ -26,7 +37,29 @@ export function Header() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const supabase = createBrowserSupabaseClient()
   const router = useRouter()
+  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+
+  // Load connections and selected email
+  useEffect(() => {
+    fetchConnections()
+    const savedConnection = localStorage.getItem("selectedConnectionId")
+    if (savedConnection) {
+      setSelectedConnectionId(savedConnection)
+    }
+  }, [])
+
+  const fetchConnections = async () => {
+    try {
+      const response = await fetch("/api/connections")
+      if (response.ok) {
+        const data = await response.json()
+        setConnections(data.connections || [])
+      }
+    } catch (error) {
+      console.error("Error fetching connections:", error)
+    }
+  }
 
   // Load notification settings
   useEffect(() => {
@@ -104,14 +137,27 @@ export function Header() {
   const handleSync = async () => {
     setIsSyncing(true)
     try {
-      const connectionsResponse = await fetch("/api/connections")
-      if (connectionsResponse.ok) {
-        const data = await connectionsResponse.json()
-        if (data.connections && data.connections.length > 0) {
-          const connectionId = data.connections[0].id
-          await fetch(`/api/connections/${connectionId}/sync`, { method: "POST" })
-          window.location.reload()
+      // Get selected connection or first connection
+      let connectionId = selectedConnectionId
+      
+      if (!connectionId) {
+        // Fetch connections if none selected
+        const connectionsResponse = await fetch("/api/connections")
+        if (connectionsResponse.ok) {
+          const data = await connectionsResponse.json()
+          if (data.connections && data.connections.length > 0) {
+            connectionId = data.connections[0].id
+            setSelectedConnectionId(connectionId)
+            if (connectionId) {
+              localStorage.setItem("selectedConnectionId", connectionId)
+            }
+          }
         }
+      }
+      
+      if (connectionId) {
+        await fetch(`/api/connections/${connectionId}/sync`, { method: "POST" })
+        window.location.reload()
       }
     } catch (error) {
       console.error("Sync error:", error)
@@ -119,6 +165,15 @@ export function Header() {
       setIsSyncing(false)
     }
   }
+
+  const handleSelectConnection = (connectionId: string) => {
+    setSelectedConnectionId(connectionId)
+    localStorage.setItem("selectedConnectionId", connectionId)
+    setShowEmailMenu(false)
+    window.location.reload()
+  }
+
+  const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -159,6 +214,43 @@ export function Header() {
           <Sun className="h-4 w-4 md:h-5 md:w-5 dark:hidden" />
           <Moon className="h-4 w-4 md:h-5 md:w-5 hidden dark:block" />
         </Button>
+
+        {/* Email account switcher */}
+        {connections.length > 1 && (
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 md:h-9 text-xs md:text-sm"
+              onClick={() => setShowEmailMenu(!showEmailMenu)}
+            >
+              <Mail className="h-4 w-4 mr-1" />
+              <span className="hidden md:inline max-w-[120px] truncate">
+                {selectedConnection?.emailAddress || "Switch Email"}
+              </span>
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+            {showEmailMenu && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-background border border-border rounded-lg shadow-lg p-2 z-50 max-h-80 overflow-y-auto">
+                <p className="text-xs text-muted-foreground px-2 py-1">
+                  Switch to:
+                </p>
+                {connections.map((connection) => (
+                  <Button
+                    key={connection.id}
+                    variant={selectedConnectionId === connection.id ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start text-left"
+                    onClick={() => handleSelectConnection(connection.id)}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    <span className="truncate">{connection.emailAddress}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Auto-sync toggle */}
         <div className="relative">

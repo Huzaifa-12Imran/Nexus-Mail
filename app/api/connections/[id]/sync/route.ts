@@ -5,6 +5,11 @@ import { nylasClient } from "@/lib/nylas"
 import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
 import { upsertEmailVector } from "@/lib/pinecone"
 
+// Check if OpenAI is rate limited
+function isRateLimited(error: any): boolean {
+  return error?.status === 429 || error?.code === "insufficient_quota" || error?.code === "rate_limit_exceeded"
+}
+
 // Helper function to parse Nylas date (handles both Unix timestamp and ISO string)
 function parseNylasDate(dateValue: number | string | undefined | null): Date {
   if (!dateValue) return new Date()
@@ -45,15 +50,17 @@ export async function POST(
     }
 
     // Check if connection is active and has access token
-    if (!connection.isActive || !connection.grantId) {
+    // For Nylas v3, the connection.id IS the grantId
+    const grantId = connection.grantId || connection.id
+    
+    if (!connection.isActive) {
       return NextResponse.json(
-        { error: "Email connection not fully authenticated. Please reconnect your account." },
+        { error: "Email connection is not active. Please reconnect your account." },
         { status: 400 }
       )
     }
 
-    // Fetch emails from Nylas using grantId
-    const grantId = connection.grantId
+    // Fetch emails from Nylas using grantId (which is the connection.id for Nylas v3)
     const emailsResponse = await nylasClient.getEmails(grantId, 50, 0)
     const nylasEmails = emailsResponse.data
 
@@ -67,47 +74,51 @@ export async function POST(
       : ["Primary", "Social", "Promotions", "Updates", "Forums"]
 
     let syncedCount = 0
+    let aiRateLimited = false
 
     for (const nylasEmail of nylasEmails) {
-      // Check if email already exists (use Nylas message ID)
-      const existing = await prisma.email.findFirst({
-        where: { messageId: nylasEmail.id },
-      })
-
-      if (existing) continue
-
-      // AI processing
-      const textContent = `${nylasEmail.subject}\n\n${nylasEmail.body}`
+      // AI processing - only if not rate limited
       let embedding: number[] | undefined
       let summary: string | undefined
       let categoryId: string | undefined
 
-      try {
-        embedding = await generateEmbedding(textContent)
-        summary = await summarizeEmail(nylasEmail.subject, nylasEmail.body)
-        
-        const categoryName = await categorizeEmail(
-          nylasEmail.subject,
-          nylasEmail.body,
-          defaultCategories
-        )
+      if (!aiRateLimited) {
+        const textContent = `${nylasEmail.subject}\n\n${nylasEmail.body}`
 
-        const category = await prisma.category.findFirst({
-          where: { userId: user.id, name: categoryName },
-        })
+        try {
+          // Try AI features
+          embedding = await generateEmbedding(textContent)
+          summary = await summarizeEmail(nylasEmail.subject, nylasEmail.body)
+          
+          const categoryName = await categorizeEmail(
+            nylasEmail.subject,
+            nylasEmail.body,
+            defaultCategories
+          )
 
-        if (category) {
-          categoryId = category.id
-        } else if (categories.length > 0) {
-          categoryId = categories[0].id
+          const category = await prisma.category.findFirst({
+            where: { userId: user.id, name: categoryName },
+          })
+
+          if (category) {
+            categoryId = category.id
+          } else if (categories.length > 0) {
+            categoryId = categories[0].id
+          }
+        } catch (aiError: any) {
+          if (isRateLimited(aiError)) {
+            aiRateLimited = true
+            console.log("OpenAI rate limited - skipping AI features for remaining emails")
+          } else {
+            console.error("AI processing error:", aiError?.message || aiError)
+          }
         }
-      } catch (aiError) {
-        console.error("AI processing error:", aiError)
       }
 
-      // Store email in database
-      const email = await prisma.email.create({
-        data: {
+      // Store email in database (upsert to handle duplicates)
+      const email = await prisma.email.upsert({
+        where: { messageId: nylasEmail.id },
+        create: {
           userId: user.id,
           connectionId: connection.id,
           messageId: nylasEmail.id,
@@ -124,6 +135,12 @@ export async function POST(
           isRead: nylasEmail.unread,
           isStarred: nylasEmail.starred,
           receivedAt: parseNylasDate(nylasEmail.received_at),
+        },
+        update: {
+          // Update fields if email already exists
+          isRead: nylasEmail.unread,
+          isStarred: nylasEmail.starred,
+          updatedAt: new Date(),
         },
       })
 

@@ -102,6 +102,7 @@ export function ComposeModal({
           subject,
           body,
           threadId: replyTo?.threadId,
+          connectionId: localStorage.getItem("selectedConnectionId"),
         }),
       })
 

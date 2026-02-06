@@ -12,6 +12,7 @@ import {
   Trash2,
   AlertCircle,
   Settings,
+  Mail,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Drafts", href: "/drafts", icon: File, folder: "drafts" },
   { name: "Spam", href: "/spam", icon: AlertCircle, folder: "spam" },
   { name: "Trash", href: "/trash", icon: Trash2, folder: "trash" },
+  { name: "Connections", href: "/connections", icon: Mail, folder: "" },
 ]
 
 interface UnreadCounts {

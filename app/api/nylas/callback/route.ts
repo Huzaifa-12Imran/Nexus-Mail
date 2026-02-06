@@ -6,6 +6,7 @@ import { nylasClient } from "@/lib/nylas"
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const grantId = searchParams.get("grant_id")
     const code = searchParams.get("code")
     const state = searchParams.get("state")
     const error = searchParams.get("error")
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       )
     }
 
-    if (!code || !state) {
+    if (!grantId && !code) {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL}/connect?error=missing_params`
       )
@@ -25,16 +26,13 @@ export async function GET(request: Request) {
     // Decode state to get email
     let email: string
     try {
-      const stateData = JSON.parse(Buffer.from(state, 'base64').toString())
+      const stateData = JSON.parse(Buffer.from(state!, 'base64').toString())
       email = stateData.email
     } catch {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL}/connect?error=invalid_state`
       )
     }
-
-    // Exchange code for token
-    const tokenResponse = await nylasClient.exchangeCode(code)
 
     // Get the Supabase user
     const supabase = createClient()
@@ -46,7 +44,25 @@ export async function GET(request: Request) {
       )
     }
 
-    // Update the pending connection
+    // Handle v3 ECC (grant_id) or v2 OAuth (code)
+    let accessToken: string | undefined
+    let refreshToken: string | undefined
+    let expiresIn: number | undefined
+    let accountGrantId: string | undefined
+
+    if (grantId) {
+      // v3 ECC - grant_id is provided directly
+      accountGrantId = grantId
+    } else if (code) {
+      // v2 OAuth - exchange code for token
+      const tokenResponse = await nylasClient.exchangeCode(code)
+      accessToken = tokenResponse.access_token
+      refreshToken = tokenResponse.refresh_token
+      expiresIn = tokenResponse.expires_in
+      accountGrantId = tokenResponse.grant_id
+    }
+
+    // Find or create the connection
     const connection = await prisma.emailConnection.findFirst({
       where: {
         userId: user.id,
@@ -58,11 +74,26 @@ export async function GET(request: Request) {
       await prisma.emailConnection.update({
         where: { id: connection.id },
         data: {
-          accessToken: tokenResponse.access_token,
-          refreshToken: tokenResponse.refresh_token,
-          grantId: tokenResponse.grant_id,
-          expiresAt: tokenResponse.expires_in 
-            ? new Date(Date.now() + tokenResponse.expires_in * 1000)
+          accessToken: accessToken || "",
+          refreshToken: refreshToken || null,
+          grantId: accountGrantId || null,
+          expiresAt: expiresIn 
+            ? new Date(Date.now() + expiresIn * 1000)
+            : null,
+          isActive: true,
+        },
+      })
+    } else {
+      await prisma.emailConnection.create({
+        data: {
+          userId: user.id,
+          emailAddress: email,
+          provider: 'gmail',
+          accessToken: accessToken || "",
+          refreshToken: refreshToken || null,
+          grantId: accountGrantId || null,
+          expiresAt: expiresIn 
+            ? new Date(Date.now() + expiresIn * 1000)
             : null,
           isActive: true,
         },
