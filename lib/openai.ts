@@ -48,9 +48,10 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
     return result[0]?.summary_text || "Unable to generate summary."
   } catch (error) {
     console.error("Summarization error:", error)
-    // Return a simple fallback summary
-    const preview = body.substring(0, 150)
-    return preview + (body.length > 150 ? "..." : "")
+    // Return a simple fallback summary (strip HTML)
+    const textOnly = body.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+    const preview = textOnly.substring(0, 150)
+    return preview + (textOnly.length > 150 ? "..." : "")
   }
 }
 
