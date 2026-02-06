@@ -499,34 +499,23 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
               </Button>
               <Link
                 href={`/email/${email.id}`}
-                className="flex-1 min-w-0 flex items-center gap-2 md:gap-24 overflow-hidden"
+                className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div
                   className={cn(
-                    "min-w-0 flex-shrink-0 w-24 md:w-36",
+                    "min-w-0 flex-shrink-0",
                     !email.isRead && "font-semibold"
                   )}
                 >
-                  <span className="truncate text-xs md:text-sm">{email.from}</span>
-                </div>
-                <div className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
-                  <span className={cn("truncate text-xs md:text-sm", !email.isRead && "font-medium")}>
+                  <span className="truncate text-xs md:text-sm block">{email.from}</span>
+                  <span className={cn("truncate text-xs", !email.isRead && "font-medium")}>
                     {email.subject}
                   </span>
-                  <span className="text-muted-foreground text-xs truncate flex-shrink-0 hidden xs:block">
-                    - {email.snippet}
-                  </span>
                 </div>
-                {email.category && (
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0 hidden sm:block"
-                    style={{ backgroundColor: email.category.color || "#888" }}
-                  />
-                )}
               </Link>
               <div 
-                className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 cursor-help relative ml-auto"
+                className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 cursor-help relative ml-2"
                 onMouseEnter={() => setHoveredDate(email.id)}
                 onMouseLeave={() => setHoveredDate(null)}
               >
