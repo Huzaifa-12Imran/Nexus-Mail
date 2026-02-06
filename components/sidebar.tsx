@@ -70,7 +70,7 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
       <Button
         variant="outline"
         size="icon"
-        className="md:hidden fixed top-4 left-4 z-50 bg-background"
+        className="lg:hidden fixed top-4 left-4 z-50 bg-background border"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
         {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -79,7 +79,7 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
       {/* Mobile overlay */}
       {isMobileOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          className="lg:hidden fixed inset-0 bg-black/50 z-30"
           onClick={handleLinkClick}
         />
       )}
@@ -87,8 +87,8 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
       {/* Sidebar */}
       <aside 
         className={cn(
-          "bg-muted/30 border-r border-border flex flex-col h-full fixed md:relative z-40 transition-transform duration-300",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          "bg-muted/30 border-r border-border flex flex-col h-full fixed lg:relative z-40 transition-transform duration-300",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           "w-64"
         )}
       >

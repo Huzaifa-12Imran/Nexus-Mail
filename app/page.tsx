@@ -16,7 +16,7 @@ export default async function HomePage() {
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop sidebar - hidden on mobile */}
-      <div className="hidden md:flex">
+      <div className="hidden lg:flex">
         <Sidebar />
       </div>
       
