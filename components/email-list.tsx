@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Star, Archive, Trash2, Mail, MailOpen, RefreshCw, Loader2, Filter, X } from "lucide-react"
+import { Star, Archive, Trash2, Mail, MailOpen, RefreshCw, Loader2, Filter, X, Menu } from "lucide-react"
 import { cn, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -309,8 +309,21 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
     <div className="flex-1 flex flex-col bg-background">
       {/* Header controls */}
       <div className="flex items-center justify-between px-2 md:px-4 py-2 border-b border-border gap-2">
-        <div className="flex items-center gap-1 md:gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2">
+          {/* Mobile menu button */}
           <Button
+            variant="outline"
+            size="icon"
+            className="lg:hidden h-8 w-8"
+            onClick={() => {
+              localStorage.setItem("sidebarOpen", "true")
+              window.dispatchEvent(new Event("storage"))
+            }}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-1 md:gap-2 overflow-x-auto">
+            <Button
             variant={currentTab === "all" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setCurrentTab("all")}

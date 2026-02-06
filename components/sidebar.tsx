@@ -40,6 +40,19 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
     fetchUnreadCounts()
   }, [])
 
+  // Listen for mobile menu toggle from other components
+  useEffect(() => {
+    const handleStorage = () => {
+      const sidebarOpen = localStorage.getItem("sidebarOpen")
+      if (sidebarOpen === "true") {
+        setIsMobileOpen(true)
+        localStorage.setItem("sidebarOpen", "false")
+      }
+    }
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
+  }, [])
+
   useEffect(() => {
     setIsMobileOpen(isOpen)
   }, [isOpen])
