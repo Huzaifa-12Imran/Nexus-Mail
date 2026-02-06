@@ -68,9 +68,9 @@ export function Sidebar({ isOpen = true, onClose }: { isOpen?: boolean; onClose?
     <>
       {/* Mobile menu button - visible only on mobile */}
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className="md:hidden fixed top-4 left-4 z-50"
+        className="md:hidden fixed top-4 left-4 z-50 bg-background"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
         {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
