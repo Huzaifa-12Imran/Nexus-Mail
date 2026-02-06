@@ -22,7 +22,7 @@ async function queryHF(endpoint: string, body: any): Promise<any> {
   return response.json()
 }
 
-// Helper function to strip HTML/CSS from any text
+// Helper function to strip HTML/CSS/code from any text
 function cleanText(input: string): string {
   if (!input) return ""
   
@@ -37,24 +37,18 @@ function cleanText(input: string): string {
     .replace(/<(link|meta)[^>]*>/gi, " ")
     // Remove all HTML tags
     .replace(/<[^>]+>/g, " ")
-    // Remove inline styles and classes
+    // Remove inline CSS and classes
     .replace(/\s*(style|class)\s*=\s*["'][^"']*["']/gi, " ")
-    // Remove CSS selectors and properties
-    .replace(/\.[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, " ")
-    .replace(/#[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, " ")
-    // Remove CSS-like patterns
-    .replace(/[.#][a-zA-Z0-9_-]+/g, " ")
+    // Remove CSS selectors like .classname { ... } or #id { ... }
+    .replace(/([.#][a-zA-Z0-9_-]+)\s*\{[^}]*\}/g, " ")
+    // Remove stray { } characters
     .replace(/[{}]/g, " ")
     // Remove URLs
     .replace(/url\([^)]+\)/g, " ")
-    // Decode HTML entities
+    // Decode HTML entities (basic)
     .replace(/&nbsp;/gi, " ")
-    .replace(/&/gi, "&")
-    .replace(/</gi, "<")
-    .replace(/>/gi, ">")
-    .replace(/"/gi, '"')
     .replace(/&#\d+;/g, " ")
-    // Remove extra whitespace
+    // Collapse whitespace
     .replace(/\s+/g, " ")
     .trim()
   
@@ -64,51 +58,72 @@ function cleanText(input: string): string {
 // Generate embedding for semantic search
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    // Use a lighter embedding model
-    const result = await queryHF("/models/sentence-transformers/all-MiniLM-L6-v2", {
-      inputs: text,
-    })
+    const result = await queryHF("/models/sentence-transformers/all-MiniLM-L6-v2", { inputs: text })
     return result || new Array(384).fill(0)
   } catch (error) {
     console.error("Embedding error:", error)
-    // Return zero vector as fallback
     return new Array(384).fill(0)
   }
 }
 
-// Summarize email using BART
+// Summarize email safely (plain-text only)
 export async function summarizeEmail(subject: string, body: string): Promise<string> {
   try {
-    // Clean the input text first
-    const cleanBody = cleanText(body)
-    const text = `Subject: ${subject}\n\n${cleanBody}`
-    
-    const result = await queryHF("/models/facebook/bart-large-cnn", {
-      inputs: text,
-      parameters: { max_length: 150, min_length: 30 }
+    let cleanBody = cleanText(body)
+
+    // Remove common email signatures
+    cleanBody = cleanBody.replace(/--\s[\s\S]*$/gm, " ")
+
+    // Truncate extremely long emails to first 2000 chars
+    if (cleanBody.length > 2000) cleanBody = cleanBody.substring(0, 2000)
+
+    const prompt = `
+You are an AI email assistant.
+Summarize this email in plain text.
+Do NOT include any HTML, CSS, code, or image references.
+Ignore banners, inline styles, and formatting instructions.
+Keep it concise (1-3 sentences).
+
+Subject: ${subject}
+
+${cleanBody}
+
+Summary:
+`
+
+    const result = await queryHF("/models/mistralai/Mistral-7B-Instruct-v0.2", {
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 150,
+        temperature: 0.3
+      }
     })
+
+    const summaryRaw = result[0]?.generated_text || ""
+    // Use comprehensive cleaning
+    let summaryClean = cleanText(summaryRaw)
     
-    // Clean the output as well
-    const summary = result[0]?.summary_text || ""
-    return cleanText(summary) || "Unable to generate summary."
+    // Extra aggressive cleaning for any remaining code
+    summaryClean = summaryClean
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/`[^`]+`/g, " ")
+      .replace(/https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|svg|webp)/gi, " ")
+      .replace(/\[![^\]]*\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+
+    return summaryClean.length > 0 ? summaryClean : cleanBody.substring(0, 150) + (cleanBody.length > 150 ? "..." : "")
   } catch (error) {
     console.error("Summarization error:", error)
-    // Return cleaned body preview
     const cleanBody = cleanText(body)
-    const preview = cleanBody.substring(0, 150)
-    return preview + (cleanBody.length > 150 ? "..." : "")
+    return cleanBody.substring(0, 150) + (cleanBody.length > 150 ? "..." : "")
   }
 }
 
 // Categorize email (rule-based + simple classification)
-export async function categorizeEmail(
-  subject: string,
-  body: string,
-  categories: string[]
-): Promise<string> {
+export async function categorizeEmail(subject: string, body: string, categories: string[]): Promise<string> {
   const text = cleanText(`${subject} ${body}`).toLowerCase()
-  
-  // Simple keyword-based categorization
+
   const keywords: Record<string, string[]> = {
     "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend", "party", "hangout"],
     "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo", "coupon"],
@@ -121,12 +136,11 @@ export async function categorizeEmail(
       return category
     }
   }
-  
-  // Default to Primary
+
   return "Primary"
 }
 
-// Generate reply suggestion using a template-based approach
+// Generate reply suggestion
 export async function generateReplySuggestion(
   subject: string,
   body: string,
@@ -134,21 +148,36 @@ export async function generateReplySuggestion(
 ): Promise<string> {
   try {
     const cleanBody = cleanText(body)
-    const prompt = `Write a ${tone} reply to this email:\nSubject: ${subject}\n\n${cleanBody}\n\nReply:`
+    const prompt = `
+You are an AI email assistant.
+Write a ${tone} reply to this email.
+Do NOT include any HTML, CSS, or code.
+Only plain text suitable for sending as an email.
 
-    const result = await queryHF("/models/microsoft/Phi-3-mini-4k-instruct", {
+Subject: ${subject}
+
+${cleanBody}
+
+Reply:
+`
+
+    const result = await queryHF("/models/mistralai/Mistral-7B-Instruct-v0.2", {
       inputs: prompt,
       parameters: { max_new_tokens: 150, temperature: 0.7 }
     })
 
-    if (result[0]?.generated_text) {
-      return cleanText(result[0].generated_text)
-    }
+    const reply = result[0]?.generated_text || ""
+    const cleanReply = reply
+      .replace(/<[^>]+>/g, "")
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+
+    if (cleanReply.length > 0) return cleanReply
   } catch (error) {
     console.error("Reply generation error:", error)
   }
 
-  // Fallback template responses
   const templates = {
     professional: `Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards`,
     casual: `Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest`,
@@ -161,13 +190,13 @@ export async function generateReplySuggestion(
 // Analyze sentiment (simple keyword-based)
 export async function analyzeSentiment(text: string): Promise<"positive" | "negative" | "neutral"> {
   const cleanInput = cleanText(text).toLowerCase()
-  
+
   const positive = ["thank", "great", "good", "excellent", "happy", "love", "appreciate", "wonderful", "amazing", "fantastic"]
   const negative = ["sorry", "bad", "problem", "issue", "error", "failed", "disappointed", "unfortunately", "wrong", "hate"]
-  
-  let posCount = positive.filter(w => cleanInput.includes(w)).length
-  let negCount = negative.filter(w => cleanInput.includes(w)).length
-  
+
+  const posCount = positive.filter(w => cleanInput.includes(w)).length
+  const negCount = negative.filter(w => cleanInput.includes(w)).length
+
   if (posCount > negCount) return "positive"
   if (negCount > posCount) return "negative"
   return "neutral"
