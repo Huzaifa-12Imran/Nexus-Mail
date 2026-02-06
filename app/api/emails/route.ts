@@ -88,12 +88,18 @@ export async function GET(request: Request) {
       }
     }
 
-    // Handle category filter - show emails with category OR no category (default to Primary)
+    // Handle category filter
     if (category && category !== "all") {
-      whereClause.OR = [
-        { category: { name: category } },
-        { category: null },
-      ]
+      // Primary shows uncategorized emails too (default)
+      if (category === "primary") {
+        whereClause.OR = [
+          { category: { name: "Primary" } },
+          { category: null },
+        ]
+      } else {
+        // Other categories only show matched category
+        whereClause.category = { name: category }
+      }
     }
 
     // Handle unread filter
