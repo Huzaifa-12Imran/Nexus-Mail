@@ -1,36 +1,35 @@
-// Using Hugging Face Inference API (Free tier available)
-// Token should be set in HUGGING_FACE_TOKEN env variable
+// Using Hugging Face Inference API directly (Free)
+// Note: Some models require enabling Inference Providers at https://huggingface.co/settings/inference-providers
 
-const HUGGING_FACE_TOKEN = process.env.HUGGING_FACE_TOKEN
-const HF_API_URL = "https://api-inference.huggingface.co/models"
+const HF_TOKEN = process.env.HUGGING_FACE_TOKEN
 
-// Helper function to query Hugging Face API
-async function queryHF(model: string, inputs: any, parameters?: any): Promise<any> {
-  const response = await fetch(`${HF_API_URL}/${model}`, {
+// Direct API call helper
+async function queryHF(endpoint: string, body: any): Promise<any> {
+  const response = await fetch(`https://api-inference.huggingface.co${endpoint}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${HUGGING_FACE_TOKEN}`,
+      Authorization: `Bearer ${HF_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      inputs,
-      parameters,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`Hugging Face API error: ${response.status} - ${error}`)
+    throw new Error(`HF API error: ${response.status} - ${error}`)
   }
 
   return response.json()
 }
 
-// Generate embedding for semantic search using sentence-transformers
+// Generate embedding for semantic search
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const result = await queryHF("sentence-transformers/all-MiniLM-L6-v2", text)
-    return result[0]
+    // Use a lighter embedding model
+    const result = await queryHF("/models/sentence-transformers/all-MiniLM-L6-v2", {
+      inputs: text,
+    })
+    return result || new Array(384).fill(0)
   } catch (error) {
     console.error("Embedding error:", error)
     // Return zero vector as fallback
@@ -42,104 +41,87 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function summarizeEmail(subject: string, body: string): Promise<string> {
   try {
     const text = `Subject: ${subject}\n\n${body}`
-    const result = await queryHF(
-      "facebook/bart-large-cnn",
-      text,
-      { max_length: 150, min_length: 30, do_sample: false }
-    )
-    return result[0]?.summary_text || ""
+    const result = await queryHF("/models/facebook/bart-large-cnn", {
+      inputs: text,
+      parameters: { max_length: 150, min_length: 30 }
+    })
+    return result[0]?.summary_text || "Unable to generate summary."
   } catch (error) {
     console.error("Summarization error:", error)
-    return "Unable to generate summary."
+    // Return a simple fallback summary
+    const preview = body.substring(0, 150)
+    return preview + (body.length > 150 ? "..." : "")
   }
 }
 
-// Categorize email using a small language model
+// Categorize email (rule-based + simple classification)
 export async function categorizeEmail(
   subject: string,
   body: string,
   categories: string[]
 ): Promise<string> {
-  try {
-    const text = `Email: Subject: ${subject}\n\n${body}`
-    const result = await queryHF(
-      "openchat/openchat_3.5",
-      {
-        messages: [
-          {
-            role: "system",
-            content: `Categorize this email into one of these categories: ${categories.join(", ")}. Respond with only the category name, nothing else.`,
-          },
-          { role: "user", content: text },
-        ],
-      },
-      { max_tokens: 20, temperature: 0.3 }
-    )
+  const text = `${subject} ${body}`.toLowerCase()
+  
+  // Simple keyword-based categorization
+  const keywords: Record<string, string[]> = {
+    "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend", "party", "hangout"],
+    "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo", "coupon"],
+    "Updates": ["update", "news", "notification", "alert", "change", "modified"],
+    "Forums": ["forum", "discussion", "group", "community", "subscribe", "unsubscribe"],
+  }
 
-    const category = result?.generated_text?.trim() || ""
-    
-    // Validate category exists
-    if (categories.includes(category)) {
+  for (const [category, words] of Object.entries(keywords)) {
+    if (categories.includes(category) && words.some(w => text.includes(w))) {
       return category
     }
-    return "Primary"
-  } catch (error) {
-    console.error("Categorization error:", error)
-    return "Primary"
   }
+  
+  // Default to Primary
+  return "Primary"
 }
 
-// Generate reply suggestion using openchat
+// Generate reply suggestion using a template-based approach
 export async function generateReplySuggestion(
   subject: string,
   body: string,
   tone: "professional" | "casual" | "brief" = "professional"
 ): Promise<string> {
   try {
-    const toneInstructions = {
-      professional: "Keep it professional and formal.",
-      casual: "Keep it friendly and casual.",
-      brief: "Keep it very brief and to the point.",
+    const prompt = `Write a ${tone} reply to this email:\nSubject: ${subject}\n\n${body}\n\nReply:`
+
+    const result = await queryHF("/models/microsoft/Phi-3-mini-4k-instruct", {
+      inputs: prompt,
+      parameters: { max_new_tokens: 150, temperature: 0.7 }
+    })
+
+    if (result[0]?.generated_text) {
+      return result[0].generated_text
     }
-
-    const result = await queryHF(
-      "openchat/openchat_3.5",
-      {
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI email assistant. ${toneInstructions[tone]} Generate a reply suggestion for the following email.`,
-          },
-          {
-            role: "user",
-            content: `Subject: ${subject}\n\n${body}`,
-          },
-        ],
-      },
-      { max_tokens: 200, temperature: 0.7 }
-    )
-
-    return result?.generated_text || ""
   } catch (error) {
     console.error("Reply generation error:", error)
-    return "Unable to generate reply suggestion."
   }
+
+  // Fallback template responses
+  const templates = {
+    professional: `Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards`,
+    casual: `Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest`,
+    brief: `Thanks for your email. I'll respond shortly.`
+  }
+
+  return templates[tone]
 }
 
-// Analyze sentiment using a sentiment model
+// Analyze sentiment (simple keyword-based)
 export async function analyzeSentiment(text: string): Promise<"positive" | "negative" | "neutral"> {
-  try {
-    const result = await queryHF("distilbert-base-uncased-finetuned-sst-2-english", text)
-    const scores = result[0]
-    
-    // Find the label with highest score
-    const label = scores.reduce((a: any, b: any) => (a.score > b.score ? a : b)).label
-    
-    if (label === "POSITIVE") return "positive"
-    if (label === "NEGATIVE") return "negative"
-    return "neutral"
-  } catch (error) {
-    console.error("Sentiment analysis error:", error)
-    return "neutral"
-  }
+  const lowerText = text.toLowerCase()
+  
+  const positive = ["thank", "great", "good", "excellent", "happy", "love", "appreciate", "wonderful", "amazing", "fantastic"]
+  const negative = ["sorry", "bad", "problem", "issue", "error", "failed", "disappointed", "unfortunately", "wrong", "hate"]
+  
+  let posCount = positive.filter(w => lowerText.includes(w)).length
+  let negCount = negative.filter(w => lowerText.includes(w)).length
+  
+  if (posCount > negCount) return "positive"
+  if (negCount > posCount) return "negative"
+  return "neutral"
 }

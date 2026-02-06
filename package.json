@@ -12,6 +12,8 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@huggingface/hub": "^2.8.1",
+    "@huggingface/inference": "^4.13.11",
     "@pinecone-database/pinecone": "^7.0.0",
     "@prisma/client": "^5.7.0",
     "@radix-ui/react-alert-dialog": "^1.0.5",
