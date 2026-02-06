@@ -48,8 +48,27 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
     return result[0]?.summary_text || "Unable to generate summary."
   } catch (error) {
     console.error("Summarization error:", error)
-    // Return a simple fallback summary (strip HTML)
-    const textOnly = body.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+    // Return a simple fallback summary (strip HTML, CSS, and common email markers)
+    let textOnly = body
+      // Remove HTML tags
+      .replace(/<[^>]*>/g, " ")
+      // Remove inline CSS style attributes
+      .replace(/style="[^"]*"/g, "")
+      .replace(/style='[^']*'/g, "")
+      // Remove class and id attributes
+      .replace(/class="[^"]*"/g, "")
+      .replace(/class='[^']*'/g, "")
+      // Decode common HTML entities
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '\"')
+      // Normalize whitespace
+      .replace(/\s+/g, " ")
+      .trim()
+    
+    // Limit to first meaningful text
     const preview = textOnly.substring(0, 150)
     return preview + (textOnly.length > 150 ? "..." : "")
   }
