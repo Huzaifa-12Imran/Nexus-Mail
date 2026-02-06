@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  accounts      Account[]
+  emails        Email[]
+  categories    Category[]
+  connections   EmailConnection[]
+  sessions      UserSession[]
+  contacts      Contact[]
+  events        Event[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model EmailConnection {
+  id              String   @id @default(cuid())
+  userId          String
+  emailAddress    String
+  provider        String   // gmail, outlook, etc.
+  grantId         String?  // Nylas grant ID
+  accessToken     String   @db.Text
+  refreshToken    String?  @db.Text
+  expiresAt       DateTime?
+  scope           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails  Email[]
+
+  @@unique([userId, emailAddress])
+}
+
+model Email {
+  id              String   @id @default(cuid())
+  userId          String
+  connectionId    String
+  messageId       String   @unique // External message ID
+  threadId        String?
+  
+  // Email fields
+  from            String
+  fromEmail       String
+  to              String   @db.Text
+  cc              String?  @db.Text
+  bcc             String?  @db.Text
+  subject         String
+  body            String   @db.Text
+  bodyHtml        String?  @db.Text
+  snippet         String?  @db.Text
+  
+  // AI generated fields
+  summary         String?  @db.Text
+  categoryId      String?
+  importance      Float    @default(0.5) // AI predicted importance score
+  sentiment       String?  // positive, negative, neutral
+  
+  // Metadata
+  isRead          Boolean  @default(false)
+  isStarred       Boolean  @default(false)
+  isArchived      Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+  isSent          Boolean  @default(false)
+  isDraft         Boolean  @default(false)
+  
+  // Vector embedding reference for semantic search
+  vectorId        String?  // Pinecone vector ID
+  
+  // Timestamps
+  receivedAt      DateTime @default(now())
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection  EmailConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  category    Category?        @relation(fields: [categoryId], references: [id])
+  labels      EmailLabel[]
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  color       String?
+  isDefault   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails  Email[]
+}
+
+model EmailLabel {
+  id          String   @id @default(cuid())
+  emailId     String
+  name        String
+  color       String?
+  createdAt   DateTime @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId, name])
+}
+
+model Draft {
+  id          String   @id @default(cuid())
+  userId      String
+  to          String   @db.Text
+  cc          String?  @db.Text
+  bcc         String?  @db.Text
+  subject     String
+  body        String   @db.Text
+  attachments String?  @db.Text // JSON array of attachments
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================================
+// SESSION MANAGEMENT (End User Sessions)
+// ============================================================================
+
+model UserSession {
+  id            String   @id @default(cuid())
+  userId        String
+  sessionToken  String   @unique
+  accessToken   String   @db.Text
+  refreshToken  String?  @db.Text
+  expiresAt     DateTime
+  scope         String?  // JSON array of scopes
+  ipAddress     String?
+  userAgent     String?
+  lastAccessedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  revokedAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+}
+
+// ============================================================================
+// CALENDAR/EVENTS (Scheduler)
+// ============================================================================
+
+model Event {
+  id              String   @id @default(cuid())
+  userId          String
+  externalId      String?  // External calendar event ID
+  accountId       String?  // Aurinko account ID
+  
+  // Event details
+  title           String
+  description     String?  @db.Text
+  location        String?
+  startTime       DateTime
+  endTime         DateTime
+  isAllDay        Boolean  @default(false)
+  timezone        String?
+  
+  // Recurrence
+  recurrence      String?  // JSON recurrence rules
+  recurrenceEnd   DateTime?
+  
+  // Status
+  status          String   @default("confirmed") // confirmed, tentative, cancelled
+  availability    String   @default("busy") // free, busy, tentative, out-of-office
+  
+  // Reminders
+  reminders       String?  // JSON array of reminders
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendees EventAttendee[]
+
+  @@index([userId])
+  @@index([startTime])
+  @@index([accountId])
+}
+
+model EventAttendee {
+  id          String   @id @default(cuid())
+  eventId     String
+  email       String
+  name        String?
+  status      String   @default("pending") // pending, accepted, declined, tentative
+  isOrganizer Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([email])
+}
+
+// ============================================================================
+// CONTACTS/CRM
+// ============================================================================
+
+model Contact {
+  id              String   @id @default(cuid())
+  userId          String
+  externalId      String?  // External contact ID
+  accountId       String?  // Aurinko account ID
+  
+  // Contact details
+  firstName       String?
+  lastName        String?
+  email           String?
+  phone           String?
+  mobile          String?
+  company         String?
+  title           String?
+  
+  // Address
+  addressStreet   String?
+  addressCity     String?
+  addressState    String?
+  addressPostal   String?
+  addressCountry  String?
+  
+  // Additional info
+  notes           String?  @db.Text
+  website         String?
+  linkedIn        String?
+  
+  // Groups
+  groups          String?  // JSON array of group names
+  
+  // Avatar
+  avatarUrl       String?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
+  @@index([company])
+}
+
+// ============================================================================
+// TASKS
+// ============================================================================
+
+model Task {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  // Task details
+  title           String
+  description     String?  @db.Text
+  status          String   @default("pending") // pending, in-progress, completed, cancelled
+  priority        String   @default("medium") // low, medium, high, urgent
+  dueDate         DateTime?
+  completedAt     DateTime?
+  
+  // Related items
+  relatedEmailId  String?
+  relatedEventId  String?
+  relatedContactId String?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// ============================================================================
+// NOTES
+// ============================================================================
+
+model Note {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  // Note details
+  title           String
+  content         String   @db.Text
+  
+  // Related item
+  relatedEmailId  String?
+  relatedContactId String?
+  relatedEventId  String?
+  
+  // Tags
+  tags            String?  // JSON array of tags
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([title])
+}
