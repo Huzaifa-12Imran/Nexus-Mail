@@ -50,23 +50,37 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
     console.error("Summarization error:", error)
     // Return a simple fallback summary (strip HTML, CSS, and common email markers)
     let textOnly = body
+      // Remove <style> blocks
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+      // Remove <script> blocks
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+      // Remove HTML comments
+      .replace(/<!--[\s\S]*?-->/g, " ")
       // Remove HTML tags
-      .replace(/<[^>]*>/g, " ")
-      // Remove inline CSS style attributes
-      .replace(/style="[^"]*"/g, "")
-      .replace(/style='[^']*'/g, "")
-      // Remove class and id attributes
-      .replace(/class="[^"]*"/g, "")
-      .replace(/class='[^']*'/g, "")
+      .replace(/<[^>]+>/g, " ")
+      // Remove inline CSS in various formats
+      .replace(/\s*style\s*=\s*["'][^"']*["']/gi, "")
+      .replace(/\s*class\s*=\s*["'][^"']*["']/gi, "")
+      // Remove CSS-like patterns (e.g., .wrapper {, #id {)
+      .replace(/\.[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, " ")
+      .replace(/#[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, " ")
+      // Remove URL references
+      .replace(/url\([^)]+\)/g, " ")
       // Decode common HTML entities
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '\"')
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#\d+;/g, " ")
       // Normalize whitespace
       .replace(/\s+/g, " ")
       .trim()
+    
+    // If still too CSS-like, extract meaningful words
+    if (textOnly.includes(".") || textOnly.includes("#") || textOnly.includes("{")) {
+      textOnly = textOnly.replace(/[.#][a-zA-Z0-9_-]+/g, " ").replace(/[{}]/g, " ").replace(/\s+/g, " ").trim()
+    }
     
     // Limit to first meaningful text
     const preview = textOnly.substring(0, 150)
