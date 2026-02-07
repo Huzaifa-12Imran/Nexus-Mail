@@ -25,6 +25,8 @@ async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promis
       messages,
       max_tokens: maxTokens,
       temperature: 0.3,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1,
     }),
     signal: controller.signal,
   })
@@ -35,7 +37,14 @@ async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promis
   }
 
   const data = await response.json()
-  return data?.choices?.[0]?.message?.content?.trim() || ""
+  
+  // Guard against empty responses
+  const content = data?.choices?.[0]?.message?.content?.trim() || ""
+  if (!content) {
+    throw new Error("AI returned empty response")
+  }
+  
+  return content
 }
 
 // Helper function to strip HTML/CSS/code from any text
@@ -114,15 +123,12 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
 
     const messages = [
       {
+        role: "system",
+        content: "You are a helpful AI assistant that always responds with plain text. Summarize emails concisely in 1-3 sentences."
+      },
+      {
         role: "user",
-        content: `You are an AI email assistant. Summarize this email in plain text in 1-3 sentences. Do NOT include any HTML, CSS, code, or image references.
-
-Subject: ${subject}
-
-Email:
-${cleanBody}
-
-Summary:`
+        content: `Subject: ${subject}\n\nEmail:\n${cleanBody}`
       }
     ]
 
@@ -183,20 +189,23 @@ export async function generateReplySuggestion(
     return templates[tone]
   }
 
+  const toneInstructions = {
+    professional: "Use a professional, formal tone",
+    casual: "Use a friendly, casual tone",
+    brief: "Keep it very brief and to the point"
+  }
+
   try {
     const cleanBody = cleanText(body)
 
     const messages = [
       {
+        role: "system",
+        content: `You are a helpful AI assistant that always responds with plain text. ${toneInstructions[tone]} Only reply with the email body, no subject line.`
+      },
+      {
         role: "user",
-        content: `You are an AI email assistant. Write a ${tone} reply to this email. Only reply with the email body, no subject line, no HTML or CSS.
-
-Subject: ${subject}
-
-Email:
-${cleanBody}
-
-Reply:`
+        content: `Subject: ${subject}\n\nEmail:\n${cleanBody}`
       }
     ]
 
