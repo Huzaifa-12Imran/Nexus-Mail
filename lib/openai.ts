@@ -8,6 +8,10 @@ const FREE_MODEL = "openrouter/free"
 
 // Helper function to query OpenRouter
 async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promise<string> {
+  // Add timeout for reliability (free models can hang)
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(), 15_000)
+
   const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -22,15 +26,16 @@ async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promis
       max_tokens: maxTokens,
       temperature: 0.3,
     }),
+    signal: controller.signal,
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`OpenRouter API error: ${response.status}`)
+    const errorText = await response.text()
+    throw new Error(`OpenRouter API error ${response.status}: ${errorText}`)
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ""
+  return data?.choices?.[0]?.message?.content?.trim() || ""
 }
 
 // Helper function to strip HTML/CSS/code from any text
