@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import { nylasClient } from "@/lib/nylas"
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)

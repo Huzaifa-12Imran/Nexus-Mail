@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { aurinkoClient } from "@/lib/aurinko"
 import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
 import { upsertEmailVector } from "@/lib/pinecone"
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
