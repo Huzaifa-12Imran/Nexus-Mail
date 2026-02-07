@@ -1,10 +1,11 @@
 // Using OpenRouter API for AI features (Free models available)
 // Get your API key from https://openrouter.ai/keys
-// Use "openrouter/free" for automatic free model selection
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
-const FREE_MODEL = "openrouter/free"
+
+// Using specific free model for reliability
+const FREE_MODEL = "mistralai/mistral-7b-instruct:free"
 
 // Helper function to query OpenRouter
 async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promise<string> {
@@ -124,7 +125,7 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
     const messages = [
       {
         role: "system",
-        content: "You are a helpful AI assistant that always responds with plain text. Summarize emails concisely in 1-3 sentences."
+        content: "You are a helpful AI assistant. Summarize the email concisely in plain text. Always provide a summary."
       },
       {
         role: "user",
@@ -183,7 +184,7 @@ export async function generateReplySuggestion(
   if (!OPENROUTER_API_KEY) {
     const templates = {
       professional: "Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards",
-      casual: "Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
+      casual: "Hi there,\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
       brief: "Thanks for your email. I'll respond shortly."
     }
     return templates[tone]
@@ -201,11 +202,11 @@ export async function generateReplySuggestion(
     const messages = [
       {
         role: "system",
-        content: `You are a helpful AI assistant that always responds with plain text. ${toneInstructions[tone]} Only reply with the email body, no subject line.`
+        content: `You are an email assistant. Write a clear, polite, and complete email reply in plain text. ${toneInstructions[tone]} Always provide a reply. Never respond with empty text.`
       },
       {
         role: "user",
-        content: `Subject: ${subject}\n\nEmail:\n${cleanBody}`
+        content: `Write a reply to this email:\n\nSubject: ${subject}\n\nEmail:\n${cleanBody}`
       }
     ]
 
@@ -223,7 +224,7 @@ export async function generateReplySuggestion(
 
   const templates = {
     professional: "Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards",
-    casual: "Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
+    casual: "Hi there,\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
     brief: "Thanks for your email. I'll respond shortly."
   }
 
