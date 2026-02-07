@@ -1,8 +1,12 @@
 // Using OpenRouter API for AI features (Free models available)
 // Get your API key from https://openrouter.ai/keys
+// Free model list: https://openrouter.ai/docs/models
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
+
+// Free models available on OpenRouter
+const FREE_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
 
 // Helper function to query OpenRouter
 async function queryOpenRouter(model: string, messages: any[], maxTokens: number = 300): Promise<string> {
@@ -120,7 +124,7 @@ Summary:`
       }
     ]
 
-    const summary = await queryOpenRouter("meta-llama/llama-3-8b-instruct:free", messages, 100)
+    const summary = await queryOpenRouter(FREE_MODEL, messages, 100)
     
     let summaryClean = cleanText(summary)
       .replace(/```[\s\S]*?```/g, " ")
@@ -194,7 +198,7 @@ Reply:`
       }
     ]
 
-    const reply = await queryOpenRouter("meta-llama/llama-3-8b-instruct:free", messages, 150)
+    const reply = await queryOpenRouter(FREE_MODEL, messages, 150)
     
     let cleanReply = cleanText(reply)
       .replace(/```[\s\S]*?```/g, " ")
