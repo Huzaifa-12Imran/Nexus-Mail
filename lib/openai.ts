@@ -1,17 +1,18 @@
-// Using OpenRouter API for AI features (Free models available)
+// Using OpenRouter API for AI features
 // Get your API key from https://openrouter.ai/keys
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
 
-// Using specific free model for reliability
-const FREE_MODEL = "mistralai/mistral-7b-instruct:free"
+// Free router for summaries (best effort)
+const FREE_ROUTER = "openrouter/free"
+// Paid mini model for replies (reliable, very cheap)
+const REPLY_MODEL = "openai/gpt-4o-mini"
 
 // Helper function to query OpenRouter
-async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promise<string> {
-  // Add timeout for reliability (free models can hang)
+async function queryOpenRouter(model: string, messages: any[], maxTokens: number = 300): Promise<string> {
   const controller = new AbortController()
-  setTimeout(() => controller.abort(), 15_000)
+  setTimeout(() => controller.abort(), 15000)
 
   const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
     method: "POST",
@@ -22,7 +23,7 @@ async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promis
       "X-Title": "AiMail",
     },
     body: JSON.stringify({
-      model: FREE_MODEL,
+      model,
       messages,
       max_tokens: maxTokens,
       temperature: 0.3,
@@ -40,8 +41,12 @@ async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promis
   const data = await response.json()
   
   // Guard against empty responses
-  const content = data?.choices?.[0]?.message?.content?.trim() || ""
-  if (!content) {
+  const content =
+    data?.choices?.[0]?.message?.content ??
+    data?.choices?.[0]?.delta?.content ??
+    ""
+  
+  if (!content.trim()) {
     throw new Error("AI returned empty response")
   }
   
@@ -53,28 +58,17 @@ function cleanText(input: string): string {
   if (!input) return ""
   
   let text = input
-    // Remove <style> blocks
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
-    // Remove <script> blocks
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
-    // Remove HTML comments
     .replace(/<!--[\s\S]*?-->/g, " ")
-    // Remove <link> and <meta> tags
     .replace(/<(link|meta)[^>]*>/gi, " ")
-    // Remove all HTML tags
     .replace(/<[^>]+>/g, " ")
-    // Remove inline CSS and classes
     .replace(/\s*(style|class)\s*=\s*["'][^"']*["']/gi, " ")
-    // Remove CSS selectors like .classname { ... } or #id { ... }
     .replace(/([.#][a-zA-Z0-9_-]+)\s*\{[^}]*\}/g, " ")
-    // Remove stray { } characters
     .replace(/[{}]/g, " ")
-    // Remove URLs
     .replace(/url\([^)]+\)/g, " ")
-    // Decode HTML entities (basic)
     .replace(/&nbsp;/gi, " ")
     .replace(/&#\d+;/g, " ")
-    // Collapse whitespace
     .replace(/\s+/g, " ")
     .trim()
   
@@ -84,7 +78,6 @@ function cleanText(input: string): string {
 // Generate embedding for semantic search (using simple text hashing)
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    // Use a simple text hashing approach as fallback since HF is slow
     const encoder = new TextEncoder()
     const data = encoder.encode(text.toLowerCase())
     const hash = new Uint8Array(16)
@@ -92,10 +85,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       hash[i % 16] = (hash[i % 16] + data[i]) % 256
     }
     
-    // Create a 384-dimensional vector from the hash
     const vector: number[] = []
     for (let i = 0; i < 384; i++) {
-      vector.push((hash[i % 16] / 128) - 1) // Normalize to -1 to 1
+      vector.push((hash[i % 16] / 128) - 1)
     }
     
     return vector
@@ -105,7 +97,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 }
 
-// Summarize email using OpenRouter
+// Summarize email using free router (works fine for short summaries)
 export async function summarizeEmail(subject: string, body: string): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.warn("OPENROUTER_API_KEY not set - using fallback summary")
@@ -115,11 +107,7 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
 
   try {
     let cleanBody = cleanText(body)
-
-    // Remove common email signatures
     cleanBody = cleanBody.replace(/--\s[\s\S]*$/gm, " ")
-
-    // Truncate extremely long emails to first 2000 chars
     if (cleanBody.length > 2000) cleanBody = cleanBody.substring(0, 2000)
 
     const messages = [
@@ -133,7 +121,7 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
       }
     ]
 
-    const summary = await queryOpenRouter(messages, 100)
+    const summary = await queryOpenRouter(FREE_ROUTER, messages, 100)
     
     let summaryClean = cleanText(summary)
       .replace(/```[\s\S]*?```/g, " ")
@@ -153,7 +141,6 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
 export async function categorizeEmail(subject: string, body: string, categories: string[]): Promise<string> {
   const text = cleanText(`${subject} ${body}`).toLowerCase()
 
-  // Strict keyword mapping - require multiple matches for each category
   const keywords: Record<string, string[]> = {
     "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend request", "new follower"],
     "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo code", "coupon", "free shipping", "50% off", "% off"],
@@ -163,9 +150,7 @@ export async function categorizeEmail(subject: string, body: string, categories:
 
   for (const [category, words] of Object.entries(keywords)) {
     if (categories.includes(category)) {
-      // Count how many keywords match
       const matches = words.filter(w => text.includes(w)).length
-      // Only categorize if at least 2 keywords match (strict filtering)
       if (matches >= 2) {
         return category
       }
@@ -175,7 +160,7 @@ export async function categorizeEmail(subject: string, body: string, categories:
   return "Primary"
 }
 
-// Generate reply suggestion using OpenRouter
+// Generate reply suggestion using paid mini model (reliable for replies)
 export async function generateReplySuggestion(
   subject: string,
   body: string,
@@ -202,7 +187,7 @@ export async function generateReplySuggestion(
     const messages = [
       {
         role: "system",
-        content: `You are an email assistant. Write a clear, polite, and complete email reply in plain text. ${toneInstructions[tone]} Always provide a reply. Never respond with empty text.`
+        content: `You are an email assistant. Write a clear, polite, and complete email reply in plain text. ${toneInstructions[tone]} Always provide a reply.`
       },
       {
         role: "user",
@@ -210,7 +195,8 @@ export async function generateReplySuggestion(
       }
     ]
 
-    const reply = await queryOpenRouter(messages, 150)
+    // Use paid mini model for reliable replies
+    const reply = await queryOpenRouter(REPLY_MODEL, messages, 150)
     
     let cleanReply = cleanText(reply)
       .replace(/```[\s\S]*?```/g, " ")
