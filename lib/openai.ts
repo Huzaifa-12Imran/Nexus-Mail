@@ -121,19 +121,26 @@ Summary:
 }
 
 // Categorize email (rule-based + simple classification)
+// Only categorize if there are multiple strong keyword matches to reduce false positives
 export async function categorizeEmail(subject: string, body: string, categories: string[]): Promise<string> {
   const text = cleanText(`${subject} ${body}`).toLowerCase()
 
+  // Strict keyword mapping - require multiple matches for each category
   const keywords: Record<string, string[]> = {
-    "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend", "party", "hangout"],
-    "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo", "coupon"],
-    "Updates": ["update", "news", "notification", "alert", "change", "modified"],
-    "Forums": ["forum", "discussion", "group", "community", "subscribe", "unsubscribe"],
+    "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend request", "new follower"],
+    "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo code", "coupon", "free shipping", "50% off", "% off"],
+    "Updates": ["update", "newsletter", "notification", "alert", "change", "modified", "status"],
+    "Forums": ["forum", "discussion", "group", "community", "subscribe", "unsubscribe", "new post"],
   }
 
   for (const [category, words] of Object.entries(keywords)) {
-    if (categories.includes(category) && words.some(w => text.includes(w))) {
-      return category
+    if (categories.includes(category)) {
+      // Count how many keywords match
+      const matches = words.filter(w => text.includes(w)).length
+      // Only categorize if at least 2 keywords match (strict filtering)
+      if (matches >= 2) {
+        return category
+      }
     }
   }
 
