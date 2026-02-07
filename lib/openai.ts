@@ -141,19 +141,34 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
 export async function categorizeEmail(subject: string, body: string, categories: string[]): Promise<string> {
   const text = cleanText(`${subject} ${body}`).toLowerCase()
 
+  // Expanded keyword mapping for each category
   const keywords: Record<string, string[]> = {
-    "Social": ["facebook", "twitter", "instagram", "linkedin", "social media", "friend request", "new follower"],
-    "Promotions": ["sale", "discount", "offer", "deal", "buy", "shop", "limited time", "promo code", "coupon", "free shipping", "50% off", "% off"],
-    "Updates": ["update", "newsletter", "notification", "alert", "change", "modified", "status"],
-    "Forums": ["forum", "discussion", "group", "community", "subscribe", "unsubscribe", "new post"],
+    "Social": [
+      "facebook", "twitter", "instagram", "linkedin", "social media", 
+      "friend request", "new follower", "mentioned you", "tagged you",
+      "invitation", "connection request", "liked your post", "commented on"
+    ],
+    "Promotions": [
+      "sale", "discount", "offer", "deal", "buy", "shop", 
+      "limited time", "promo code", "coupon", "free shipping", 
+      "50% off", "% off", "special offer", "flash sale", "best price",
+      "order now", "limited stock", "don't miss", "last chance"
+    ],
+    "Updates": [
+      "update", "newsletter", "notification", "alert", "change", 
+      "modified", "status", "confirmation", "receipt", "shipping",
+      "delivered", "track your order", "your order", "account update"
+    ],
+    "Forums": [
+      "forum", "discussion", "group", "community", "subscribe", 
+      "unsubscribe", "new post", "reply to", "thread", "topic"
+    ],
   }
 
+  // Find matching category (first match wins)
   for (const [category, words] of Object.entries(keywords)) {
-    if (categories.includes(category)) {
-      const matches = words.filter(w => text.includes(w)).length
-      if (matches >= 2) {
-        return category
-      }
+    if (categories.includes(category) && words.some(w => text.includes(w))) {
+      return category
     }
   }
 
