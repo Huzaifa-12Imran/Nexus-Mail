@@ -3,6 +3,7 @@
 // Note: New email connections may need to be added through the Nylas Dashboard
 
 const NYLAS_API_URL = process.env.NYLAS_API_URL || 'https://api.us.nylas.com'
+const NYLAS_API_KEY = process.env.NEXT_PUBLIC_NYLAS_API_KEY!
 const NYLAS_CLIENT_ID = process.env.NYLAS_CLIENT_ID!
 const NYLAS_CLIENT_SECRET = process.env.NYLAS_CLIENT_SECRET!
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -133,7 +134,7 @@ export async function listGrants() {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -156,7 +157,7 @@ export async function getGrant(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -180,7 +181,7 @@ export async function deleteGrant(grantId: string): Promise<void> {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -209,7 +210,7 @@ export async function getEmails(grantId: string, limit: number = 50, offset: num
     
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/messages?${params.toString()}`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -232,7 +233,7 @@ export async function getEmail(grantId: string, messageId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/messages/${messageId}`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -264,7 +265,7 @@ export async function sendEmail(grantId: string, email: {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/messages/send`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -300,7 +301,7 @@ export async function getFolders(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/folders`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -327,7 +328,7 @@ export async function getLabels(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/labels`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -354,7 +355,7 @@ export async function getCalendars(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/calendars`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
@@ -385,7 +386,7 @@ export async function getContacts(grantId: string, limit: number = 100) {
     
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/contacts?${params.toString()}`, {
       headers: {
-        'Authorization': `Bearer ${NYLAS_CLIENT_SECRET}`,
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
         'Content-Type': 'application/json',
       },
     })
