@@ -1,25 +1,34 @@
-// Using Hugging Face Inference API directly (Free)
-// Note: Some models require enabling Inference Providers at https://huggingface.co/settings/inference-providers
+// Using OpenRouter API for AI features (Free models available)
+// Get your API key from https://openrouter.ai/keys
 
-const HF_TOKEN = process.env.HUGGING_FACE_TOKEN
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
 
-// Direct API call helper
-async function queryHF(endpoint: string, body: any): Promise<any> {
-  const response = await fetch(`https://api-inference.huggingface.co${endpoint}`, {
+// Helper function to query OpenRouter
+async function queryOpenRouter(model: string, messages: any[], maxTokens: number = 300): Promise<string> {
+  const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${HF_TOKEN}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": "https://aimail.app",
+      "X-Title": "AiMail",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    }),
   })
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`HF API error: ${response.status}`)
+    throw new Error(`OpenRouter API error: ${response.status} - ${error}`)
   }
 
-  return response.json()
+  const data = await response.json()
+  return data.choices[0]?.message?.content || ""
 }
 
 // Helper function to strip HTML/CSS/code from any text
@@ -55,19 +64,39 @@ function cleanText(input: string): string {
   return text
 }
 
-// Generate embedding for semantic search
+// Generate embedding for semantic search (using simple text hashing)
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const result = await queryHF("/models/sentence-transformers/all-MiniLM-L6-v2", { inputs: text })
-    return result || new Array(384).fill(0)
+    // Use a simple text hashing approach as fallback since HF is slow
+    // This creates a deterministic vector from text
+    const encoder = new TextEncoder()
+    const data = encoder.encode(text.toLowerCase())
+    const hash = new Uint8Array(16)
+    for (let i = 0; i < data.length; i++) {
+      hash[i % 16] = (hash[i % 16] + data[i]) % 256
+    }
+    
+    // Create a 384-dimensional vector from the hash
+    const vector: number[] = []
+    for (let i = 0; i < 384; i++) {
+      vector.push((hash[i % 16] / 128) - 1) // Normalize to -1 to 1
+    }
+    
+    return vector
   } catch (error) {
     console.error("Embedding error:", error)
     return new Array(384).fill(0)
   }
 }
 
-// Summarize email safely (plain-text only)
+// Summarize email using OpenRouter (Llama 3 free model)
 export async function summarizeEmail(subject: string, body: string): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    console.warn("OPENROUTER_API_KEY not set - using fallback summary")
+    const cleanBody = cleanText(body)
+    return cleanBody.substring(0, 150) + (cleanBody.length > 150 ? "..." : "")
+  }
+
   try {
     let cleanBody = cleanText(body)
 
@@ -77,42 +106,29 @@ export async function summarizeEmail(subject: string, body: string): Promise<str
     // Truncate extremely long emails to first 2000 chars
     if (cleanBody.length > 2000) cleanBody = cleanBody.substring(0, 2000)
 
-    const prompt = `
-You are an AI email assistant.
-Summarize this email in plain text.
-Do NOT include any HTML, CSS, code, or image references.
-Ignore banners, inline styles, and formatting instructions.
-Keep it concise (1-3 sentences).
+    const messages = [
+      {
+        role: "user",
+        content: `You are an AI email assistant. Summarize this email in plain text in 1-3 sentences. Do NOT include any HTML, CSS, code, or image references.
 
 Subject: ${subject}
 
+Email:
 ${cleanBody}
 
-Summary:
-`
-
-    const result = await queryHF("/models/mistralai/Mistral-7B-Instruct-v0.2", {
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 150,
-        temperature: 0.3
+Summary:`
       }
-    })
+    ]
 
-    const summaryRaw = result[0]?.generated_text || ""
-    // Use comprehensive cleaning
-    let summaryClean = cleanText(summaryRaw)
+    const summary = await queryOpenRouter("meta-llama/llama-3-8b-instruct:free", messages, 100)
     
-    // Extra aggressive cleaning for any remaining code
-    summaryClean = summaryClean
+    let summaryClean = cleanText(summary)
       .replace(/```[\s\S]*?```/g, " ")
       .replace(/`[^`]+`/g, " ")
-      .replace(/https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|svg|webp)/gi, " ")
-      .replace(/\[![^\]]*\]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
 
-    return summaryClean.length > 0 ? summaryClean : cleanBody.substring(0, 150) + (cleanBody.length > 150 ? "..." : "")
+    return summaryClean.length > 0 ? summaryClean : cleanBody.substring(0, 150) + "..."
   } catch (error) {
     console.error("Summarization error:", error)
     const cleanBody = cleanText(body)
@@ -120,8 +136,7 @@ Summary:
   }
 }
 
-// Categorize email (rule-based + simple classification)
-// Only categorize if there are multiple strong keyword matches to reduce false positives
+// Categorize email (rule-based + simple keyword matching)
 export async function categorizeEmail(subject: string, body: string, categories: string[]): Promise<string> {
   const text = cleanText(`${subject} ${body}`).toLowerCase()
 
@@ -147,36 +162,42 @@ export async function categorizeEmail(subject: string, body: string, categories:
   return "Primary"
 }
 
-// Generate reply suggestion
+// Generate reply suggestion using OpenRouter
 export async function generateReplySuggestion(
   subject: string,
   body: string,
   tone: "professional" | "casual" | "brief" = "professional"
 ): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    const templates = {
+      professional: "Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards",
+      casual: "Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
+      brief: "Thanks for your email. I'll respond shortly."
+    }
+    return templates[tone]
+  }
+
   try {
     const cleanBody = cleanText(body)
-    const prompt = `
-You are an AI email assistant.
-Write a ${tone} reply to this email.
-Do NOT include any HTML, CSS, or code.
-Only plain text suitable for sending as an email.
+
+    const messages = [
+      {
+        role: "user",
+        content: `You are an AI email assistant. Write a ${tone} reply to this email. Only reply with the email body, no subject line, no HTML or CSS.
 
 Subject: ${subject}
 
+Email:
 ${cleanBody}
 
-Reply:
-`
+Reply:`
+      }
+    ]
 
-    const result = await queryHF("/models/mistralai/Mistral-7B-Instruct-v0.2", {
-      inputs: prompt,
-      parameters: { max_new_tokens: 150, temperature: 0.7 }
-    })
-
-    const reply = result[0]?.generated_text || ""
-    const cleanReply = reply
-      .replace(/<[^>]+>/g, "")
-      .replace(/```[\s\S]*?```/g, "")
+    const reply = await queryOpenRouter("meta-llama/llama-3-8b-instruct:free", messages, 150)
+    
+    let cleanReply = cleanText(reply)
+      .replace(/```[\s\S]*?```/g, " ")
       .replace(/\s+/g, " ")
       .trim()
 
@@ -186,9 +207,9 @@ Reply:
   }
 
   const templates = {
-    professional: `Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards`,
-    casual: `Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest`,
-    brief: `Thanks for your email. I'll respond shortly.`
+    professional: "Dear Sender,\n\nThank you for your email. I have received your message and will review it shortly.\n\nBest regards",
+    casual: "Hi there!\n\nThanks for reaching out! I'll get back to you soon.\n\nBest",
+    brief: "Thanks for your email. I'll respond shortly."
   }
 
   return templates[tone]
