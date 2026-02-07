@@ -1,15 +1,13 @@
 // Using OpenRouter API for AI features (Free models available)
 // Get your API key from https://openrouter.ai/keys
-// Free model list: https://openrouter.ai/docs/models
+// Use "openrouter/free" for automatic free model selection
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
-
-// Free models available on OpenRouter
-const FREE_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+const FREE_MODEL = "openrouter/free"
 
 // Helper function to query OpenRouter
-async function queryOpenRouter(model: string, messages: any[], maxTokens: number = 300): Promise<string> {
+async function queryOpenRouter(messages: any[], maxTokens: number = 300): Promise<string> {
   const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -19,7 +17,7 @@ async function queryOpenRouter(model: string, messages: any[], maxTokens: number
       "X-Title": "AiMail",
     },
     body: JSON.stringify({
-      model,
+      model: FREE_MODEL,
       messages,
       max_tokens: maxTokens,
       temperature: 0.3,
@@ -28,7 +26,7 @@ async function queryOpenRouter(model: string, messages: any[], maxTokens: number
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`OpenRouter API error: ${response.status} - ${error}`)
+    throw new Error(`OpenRouter API error: ${response.status}`)
   }
 
   const data = await response.json()
@@ -72,7 +70,6 @@ function cleanText(input: string): string {
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
     // Use a simple text hashing approach as fallback since HF is slow
-    // This creates a deterministic vector from text
     const encoder = new TextEncoder()
     const data = encoder.encode(text.toLowerCase())
     const hash = new Uint8Array(16)
@@ -93,7 +90,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 }
 
-// Summarize email using OpenRouter (Llama 3 free model)
+// Summarize email using OpenRouter
 export async function summarizeEmail(subject: string, body: string): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.warn("OPENROUTER_API_KEY not set - using fallback summary")
@@ -124,7 +121,7 @@ Summary:`
       }
     ]
 
-    const summary = await queryOpenRouter(FREE_MODEL, messages, 100)
+    const summary = await queryOpenRouter(messages, 100)
     
     let summaryClean = cleanText(summary)
       .replace(/```[\s\S]*?```/g, " ")
@@ -198,7 +195,7 @@ Reply:`
       }
     ]
 
-    const reply = await queryOpenRouter(FREE_MODEL, messages, 150)
+    const reply = await queryOpenRouter(messages, 150)
     
     let cleanReply = cleanText(reply)
       .replace(/```[\s\S]*?```/g, " ")
