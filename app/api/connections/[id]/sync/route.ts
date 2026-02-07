@@ -5,10 +5,8 @@ import { nylasClient } from "@/lib/nylas"
 import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
 import { upsertEmailVector } from "@/lib/pinecone"
 
-// Check if OpenAI is rate limited
-function isRateLimited(error: any): boolean {
-  return error?.status === 429 || error?.code === "insufficient_quota" || error?.code === "rate_limit_exceeded"
-}
+// Timeout for AI operations (10 seconds)
+const AI_TIMEOUT_MS = 10000
 
 // Helper function to parse Nylas date (handles both Unix timestamp and ISO string)
 function parseNylasDate(dateValue: number | string | undefined | null): Date {
@@ -26,10 +24,26 @@ function parseNylasDate(dateValue: number | string | undefined | null): Date {
   return new Date()
 }
 
+// Helper function to run AI operations with timeout
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<T | null>((resolve) => 
+      setTimeout(() => {
+        console.log(`[Sync] AI operation timed out after ${ms}ms`)
+        resolve(null)
+      }, ms)
+    )
+  ])
+}
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const startTime = Date.now()
+  console.log('[Sync] Starting email sync...')
+
   try {
     const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -49,8 +63,7 @@ export async function POST(
       return NextResponse.json({ error: "Connection not found" }, { status: 404 })
     }
 
-    // Check if connection is active and has access token
-    // For Nylas v3, the connection.id IS the grantId
+    // Check if connection is active
     const grantId = connection.grantId || connection.id
     
     if (!connection.isActive) {
@@ -60,9 +73,11 @@ export async function POST(
       )
     }
 
-    // Fetch emails from Nylas using grantId (which is the connection.id for Nylas v3)
-    const emailsResponse = await nylasClient.getEmails(grantId, 50, 0)
+    // Fetch emails from Nylas (limit to 20 for faster sync)
+    console.log('[Sync] Fetching emails from Nylas...')
+    const emailsResponse = await nylasClient.getEmails(grantId, 20, 0)
     const nylasEmails = emailsResponse.data
+    console.log(`[Sync] Found ${nylasEmails.length} emails to sync`)
 
     // Get default categories
     const categories = await prisma.category.findMany({
@@ -74,48 +89,47 @@ export async function POST(
       : ["Primary", "Social", "Promotions", "Updates", "Forums"]
 
     let syncedCount = 0
-    let aiRateLimited = false
+    let skippedAI = 0
 
     for (const nylasEmail of nylasEmails) {
-      // AI processing - only if not rate limited
-      let embedding: number[] | undefined
+      let embedding: number[] | null = null
       let summary: string | undefined
       let categoryId: string | undefined
 
-      if (!aiRateLimited) {
-        const textContent = `${nylasEmail.subject}\n\n${nylasEmail.body}`
+      // Try AI features with timeout
+      const textContent = `${nylasEmail.subject}\n\n${nylasEmail.body}`
 
-        try {
-          // Try AI features
-          embedding = await generateEmbedding(textContent)
-          summary = await summarizeEmail(nylasEmail.subject, nylasEmail.body)
-          
-          const categoryName = await categorizeEmail(
-            nylasEmail.subject,
-            nylasEmail.body,
-            defaultCategories
-          )
+      try {
+        // Run embedding and categorization in parallel with timeout
+        const [embeddingResult, summaryResult, categoryName] = await Promise.all([
+          withTimeout(generateEmbedding(textContent), AI_TIMEOUT_MS),
+          withTimeout(summarizeEmail(nylasEmail.subject, nylasEmail.body), AI_TIMEOUT_MS),
+          withTimeout(categorizeEmail(nylasEmail.subject, nylasEmail.body, defaultCategories), AI_TIMEOUT_MS),
+        ])
 
-          const category = await prisma.category.findFirst({
-            where: { userId: user.id, name: categoryName },
-          })
-
-          if (category) {
-            categoryId = category.id
-          } else if (categories.length > 0) {
-            categoryId = categories[0].id
-          }
-        } catch (aiError: any) {
-          if (isRateLimited(aiError)) {
-            aiRateLimited = true
-            console.log("OpenAI rate limited - skipping AI features for remaining emails")
-          } else {
-            console.error("AI processing error:", aiError?.message || aiError)
-          }
+        if (embeddingResult) {
+          embedding = embeddingResult
+        } else {
+          skippedAI++
         }
+        
+        summary = summaryResult || undefined
+
+        const category = await prisma.category.findFirst({
+          where: { userId: user.id, name: categoryName || "Primary" },
+        })
+
+        if (category) {
+          categoryId = category.id
+        } else if (categories.length > 0) {
+          categoryId = categories[0].id
+        }
+      } catch (aiError: any) {
+        console.log(`[Sync] AI processing skipped for email ${nylasEmail.id}:`, aiError?.message || 'Unknown error')
+        skippedAI++
       }
 
-      // Store email in database (upsert to handle duplicates)
+      // Store email in database
       const email = await prisma.email.upsert({
         where: { messageId: nylasEmail.id },
         create: {
@@ -137,7 +151,6 @@ export async function POST(
           receivedAt: parseNylasDate(nylasEmail.received_at),
         },
         update: {
-          // Update fields if email already exists
           isRead: nylasEmail.unread,
           isStarred: nylasEmail.starred,
           updatedAt: new Date(),
@@ -155,20 +168,23 @@ export async function POST(
             receivedAt: parseNylasDate(nylasEmail.received_at).toISOString(),
           })
         } catch (vectorError) {
-          console.error("Vector storage error:", vectorError)
+          console.error("[Sync] Vector storage error:", vectorError)
         }
       }
 
       syncedCount++
     }
 
+    const elapsed = Date.now() - startTime
+    console.log(`[Sync] Completed in ${elapsed}ms - synced ${syncedCount} emails (AI skipped: ${skippedAI})`)
+
     return NextResponse.json({
       success: true,
       synced: syncedCount,
-      message: `Synced ${syncedCount} new emails`,
+      message: `Synced ${syncedCount} emails in ${Math.round(elapsed/1000)}s`,
     })
   } catch (error: any) {
-    console.error("Error syncing emails:", error)
+    console.error("[Sync] Error syncing emails:", error)
     return NextResponse.json(
       { error: error.message || "Failed to sync emails" },
       { status: 500 }
