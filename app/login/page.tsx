@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+  const router = useRouter()
   const supabase = createBrowserSupabaseClient()
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -29,6 +31,9 @@ export default function LoginPage() {
           password,
         })
         if (error) throw error
+        // Redirect to home on successful login
+        router.push("/")
+        router.refresh()
       }
     } catch (error) {
       alert((error as Error).message)
