@@ -438,7 +438,6 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
         </div>
       </div>
 
-      {/* Bulk actions toolbar - appears before filters for better visibility */}
       {showBulkActions && (
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 px-2 md:px-4 py-2 bg-primary text-primary-foreground border-b border-primary shadow-sm">
           <span className="text-sm font-medium">
@@ -472,7 +471,6 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
         </div>
       )}
 
-      {/* Filters panel */}
       {showFilters && (
         <div className="px-2 md:px-4 py-3 border-b border-border bg-muted/30">
           <div className="flex flex-wrap gap-2 md:gap-3 items-end">

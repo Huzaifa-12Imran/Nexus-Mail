@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, Check, Clock, Loader2, RefreshCw, Trash2, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Bell, Check, Clock, Loader2, RefreshCw, Trash2, Plus, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { ReminderModal } from '@/components/reminder-modal'
@@ -24,6 +25,7 @@ interface Reminder {
 }
 
 export default function RemindersPage() {
+  const router = useRouter()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showReminderModal, setShowReminderModal] = useState(false)
@@ -122,10 +124,15 @@ export default function RemindersPage() {
     <div className="flex-1 flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Bell className="h-5 w-5" />
-          Reminders
-        </h1>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Reminders
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"

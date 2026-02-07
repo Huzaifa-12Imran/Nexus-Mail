@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Loader2, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Clock, Loader2, RefreshCw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
@@ -22,6 +23,7 @@ interface SnoozedEmail {
 }
 
 export default function SnoozedPage() {
+  const router = useRouter()
   const [snoozedEmails, setSnoozedEmails] = useState<SnoozedEmail[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
@@ -73,10 +75,15 @@ export default function SnoozedPage() {
     <div className="flex-1 flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Snoozed
-        </h1>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Snoozed
+          </h1>
+        </div>
         <Button
           variant="ghost"
           size="icon"

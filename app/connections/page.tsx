@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Mail, Plus, Trash2, Loader2 } from "lucide-react"
+import { Mail, Plus, Trash2, Loader2, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
@@ -101,8 +101,12 @@ export default function ConnectionsPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
         <h1 className="text-3xl font-bold">Email Connections</h1>
+        <div className="flex-1" />
         <Button onClick={handleSync} disabled={syncing}>
           {syncing ? (
             <>

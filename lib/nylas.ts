@@ -8,9 +8,6 @@ const NYLAS_CLIENT_ID = process.env.NYLAS_CLIENT_ID!
 const NYLAS_CLIENT_SECRET = process.env.NYLAS_CLIENT_SECRET!
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-// ============================================================================
-// OAUTH - Create Connect URL
-// ============================================================================
 
 export async function createConnectUrl(
   emailAddress: string,
@@ -18,7 +15,7 @@ export async function createConnectUrl(
 ): Promise<{ url: string; state: string }> {
   const state = Buffer.from(JSON.stringify({ email: emailAddress })).toString('base64')
   
-  // Try the Nylas v3 Connect authorize endpoint
+  // Trying the Nylas v3 Connect authorize endpoint
   const url = `${NYLAS_API_URL}/v3/connect/authorize?${new URLSearchParams({
     client_id: NYLAS_CLIENT_ID,
     redirect_uri: `${NEXT_PUBLIC_APP_URL}/api/nylas/callback`,
@@ -34,10 +31,6 @@ export async function createConnectUrl(
     state,
   }
 }
-
-// ============================================================================
-// OAUTH - Exchange Code for Token
-// ============================================================================
 
 export async function exchangeCode(code: string) {
   console.log('[Nylas] Exchanging code for token...')
@@ -84,10 +77,6 @@ export async function exchangeCode(code: string) {
   }
 }
 
-// ============================================================================
-// REFRESH TOKEN
-// ============================================================================
-
 export async function refreshAccessToken(refreshToken: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/connect/token`, {
@@ -125,10 +114,6 @@ export async function refreshAccessToken(refreshToken: string) {
     throw error
   }
 }
-
-// ============================================================================
-// GRANTS (Connected Accounts)
-// ============================================================================
 
 export async function listGrants() {
   try {
@@ -196,10 +181,6 @@ export async function deleteGrant(grantId: string): Promise<void> {
     throw error
   }
 }
-
-// ============================================================================
-// EMAILS (Messages) - Access via grant_id
-// ============================================================================
 
 export async function getEmails(grantId: string, limit: number = 50, offset: number = 0) {
   try {
@@ -293,10 +274,6 @@ export async function sendEmail(grantId: string, email: {
   }
 }
 
-// ============================================================================
-// FOLDERS
-// ============================================================================
-
 export async function getFolders(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/folders`, {
@@ -320,9 +297,6 @@ export async function getFolders(grantId: string) {
   }
 }
 
-// ============================================================================
-// LABELS (for Gmail)
-// ============================================================================
 
 export async function getLabels(grantId: string) {
   try {
@@ -347,10 +321,6 @@ export async function getLabels(grantId: string) {
   }
 }
 
-// ============================================================================
-// CALENDARS
-// ============================================================================
-
 export async function getCalendars(grantId: string) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/calendars`, {
@@ -374,9 +344,6 @@ export async function getCalendars(grantId: string) {
   }
 }
 
-// ============================================================================
-// CONTACTS
-// ============================================================================
 
 export async function getContacts(grantId: string, limit: number = 100) {
   try {
@@ -405,9 +372,6 @@ export async function getContacts(grantId: string, limit: number = 100) {
   }
 }
 
-// ============================================================================
-// NYLAS CLIENT EXPORT (for backward compatibility)
-// ============================================================================
 
 export const nylasClient = {
   createConnectUrl,
