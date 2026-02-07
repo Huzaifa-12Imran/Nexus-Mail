@@ -1,6 +1,6 @@
 # Nexus Mail
 
-An AI-powered email client with smart features built using modern full-stack technologies.
+An AI-powered email client with smart features built using modern full-stack technologies made with love and passion.
 
 ## Features
 
