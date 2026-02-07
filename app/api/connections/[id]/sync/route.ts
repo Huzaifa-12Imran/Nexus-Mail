@@ -2,11 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import { nylasClient } from "@/lib/nylas"
-import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
-import { upsertEmailVector } from "@/lib/pinecone"
-
-// Timeout for AI operations (10 seconds)
-const AI_TIMEOUT_MS = 10000
+import { categorizeEmail } from "@/lib/openai"
 
 // Helper function to parse Nylas date (handles both Unix timestamp and ISO string)
 function parseNylasDate(dateValue: number | string | undefined | null): Date {
@@ -22,19 +18,6 @@ function parseNylasDate(dateValue: number | string | undefined | null): Date {
   }
   
   return new Date()
-}
-
-// Helper function to run AI operations with timeout
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<T | null>((resolve) => 
-      setTimeout(() => {
-        console.log(`[Sync] AI operation timed out after ${ms}ms`)
-        resolve(null)
-      }, ms)
-    )
-  ])
 }
 
 export async function POST(
@@ -73,9 +56,9 @@ export async function POST(
       )
     }
 
-    // Fetch emails from Nylas (limit to 20 for faster sync)
+    // Fetch emails from Nylas (limit to 50 for faster sync)
     console.log('[Sync] Fetching emails from Nylas...')
-    const emailsResponse = await nylasClient.getEmails(grantId, 20, 0)
+    const emailsResponse = await nylasClient.getEmails(grantId, 50, 0)
     const nylasEmails = emailsResponse.data
     console.log(`[Sync] Found ${nylasEmails.length} emails to sync`)
 
@@ -89,31 +72,17 @@ export async function POST(
       : ["Primary", "Social", "Promotions", "Updates", "Forums"]
 
     let syncedCount = 0
-    let skippedAI = 0
 
     for (const nylasEmail of nylasEmails) {
-      let embedding: number[] | null = null
-      let summary: string | undefined
       let categoryId: string | undefined
 
-      // Try AI features with timeout
-      const textContent = `${nylasEmail.subject}\n\n${nylasEmail.body}`
-
+      // Use rule-based categorization only (no AI for speed)
       try {
-        // Run embedding and categorization in parallel with timeout
-        const [embeddingResult, summaryResult, categoryName] = await Promise.all([
-          withTimeout(generateEmbedding(textContent), AI_TIMEOUT_MS),
-          withTimeout(summarizeEmail(nylasEmail.subject, nylasEmail.body), AI_TIMEOUT_MS),
-          withTimeout(categorizeEmail(nylasEmail.subject, nylasEmail.body, defaultCategories), AI_TIMEOUT_MS),
-        ])
-
-        if (embeddingResult) {
-          embedding = embeddingResult
-        } else {
-          skippedAI++
-        }
-        
-        summary = summaryResult || undefined
+        const categoryName = await categorizeEmail(
+          nylasEmail.subject,
+          nylasEmail.body,
+          defaultCategories
+        )
 
         const category = await prisma.category.findFirst({
           where: { userId: user.id, name: categoryName || "Primary" },
@@ -124,13 +93,12 @@ export async function POST(
         } else if (categories.length > 0) {
           categoryId = categories[0].id
         }
-      } catch (aiError: any) {
-        console.log(`[Sync] AI processing skipped for email ${nylasEmail.id}:`, aiError?.message || 'Unknown error')
-        skippedAI++
+      } catch (catError) {
+        console.warn(`[Sync] Categorization error for ${nylasEmail.id}:`, catError)
       }
 
       // Store email in database
-      const email = await prisma.email.upsert({
+      await prisma.email.upsert({
         where: { messageId: nylasEmail.id },
         create: {
           userId: user.id,
@@ -138,13 +106,12 @@ export async function POST(
           messageId: nylasEmail.id,
           from: nylasEmail.from[0]?.name || nylasEmail.from[0]?.email || "Unknown",
           fromEmail: nylasEmail.from[0]?.email || "",
-          to: nylasEmail.to.map((t) => t.email).join(", "),
-          cc: nylasEmail.cc?.map((c) => c.email).join(", ") || null,
-          bcc: nylasEmail.bcc?.map((b) => b.email).join(", ") || null,
+          to: nylasEmail.to.map((t: any) => t.email).join(", "),
+          cc: nylasEmail.cc?.map((c: any) => c.email).join(", ") || null,
+          bcc: nylasEmail.bcc?.map((b: any) => b.email).join(", ") || null,
           subject: nylasEmail.subject,
           body: nylasEmail.body,
           snippet: nylasEmail.snippet || null,
-          summary,
           categoryId,
           isRead: nylasEmail.unread,
           isStarred: nylasEmail.starred,
@@ -157,26 +124,11 @@ export async function POST(
         },
       })
 
-      // Store vector embedding in Pinecone
-      if (embedding) {
-        try {
-          await upsertEmailVector(email.id, embedding, {
-            userId: user.id,
-            subject: nylasEmail.subject,
-            body: nylasEmail.body,
-            from: nylasEmail.from[0]?.email || "",
-            receivedAt: parseNylasDate(nylasEmail.received_at).toISOString(),
-          })
-        } catch (vectorError) {
-          console.error("[Sync] Vector storage error:", vectorError)
-        }
-      }
-
       syncedCount++
     }
 
     const elapsed = Date.now() - startTime
-    console.log(`[Sync] Completed in ${elapsed}ms - synced ${syncedCount} emails (AI skipped: ${skippedAI})`)
+    console.log(`[Sync] Completed in ${elapsed}ms - synced ${syncedCount} emails (rule-based categorization)`)
 
     return NextResponse.json({
       success: true,

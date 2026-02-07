@@ -113,6 +113,7 @@ model Email {
   connection  EmailConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   category    Category?        @relation(fields: [categoryId], references: [id])
   labels      EmailLabel[]
+  snoozed     SnoozedEmail[]
 }
 
 model Category {
@@ -357,6 +358,9 @@ model SnoozedEmail {
   // Snooze details
   snoozeUntil DateTime
   folder      String   @default("inbox") // inbox, primary, social, promotions
+  
+  // Relation to Email
+  email       Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
   
   // Metadata
   createdAt   DateTime @default(now())
