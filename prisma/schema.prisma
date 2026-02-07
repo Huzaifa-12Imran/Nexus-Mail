@@ -99,6 +99,7 @@ model Email {
   isDeleted       Boolean  @default(false)
   isSent          Boolean  @default(false)
   isDraft         Boolean  @default(false)
+  isSpam          Boolean  @default(false)
   
   // Vector embedding reference for semantic search
   vectorId        String?  // Pinecone vector ID
