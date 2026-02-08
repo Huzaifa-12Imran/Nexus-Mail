@@ -43,13 +43,25 @@ export default function LoginPage() {
   }
 
   const handleGoogleSignIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    })
-    if (error) alert(error.message)
+    setIsLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          scopes: "email profile",
+        },
+      })
+      if (error) {
+        console.error("Google sign-in error:", error)
+        alert(`Google sign-in failed: ${error.message}`)
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err)
+      alert("An unexpected error occurred during Google sign-in")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -104,6 +116,7 @@ export default function LoginPage() {
           variant="outline"
           className="w-full"
           onClick={handleGoogleSignIn}
+          disabled={isLoading}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
