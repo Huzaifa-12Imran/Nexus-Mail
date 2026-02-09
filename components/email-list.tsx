@@ -30,6 +30,38 @@ interface Email {
   receivedAt: string
 }
 
+// Context-aware empty state messages
+const emptyStateMessages: Record<string, { title: string; description: string }> = {
+  inbox: {
+    title: "No emails in inbox",
+    description: "Your inbox is empty. Connect an email account to get started.",
+  },
+  starred: {
+    title: "No starred emails",
+    description: "Starred emails will appear here.",
+  },
+  sent: {
+    title: "No sent emails",
+    description: "Emails you've sent will appear here.",
+  },
+  drafts: {
+    title: "No drafts",
+    description: "Draft emails will appear here.",
+  },
+  spam: {
+    title: "No spam emails",
+    description: "Spam emails will appear here.",
+  },
+  trash: {
+    title: "No emails in trash",
+    description: "Deleted emails will appear here.",
+  },
+  snoozed: {
+    title: "No snoozed emails",
+    description: "Snoozed emails will appear here.",
+  },
+}
+
 export function EmailList({ folder, category }: { folder?: string; category?: string }) {
   const [emails, setEmails] = useState<Email[]>([])
   const [filteredEmails, setFilteredEmails] = useState<Email[]>([])
@@ -524,13 +556,15 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
         ) : filteredEmails.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Mail className="h-12 w-12 mb-4" />
-            <p className="text-lg font-medium">No emails found</p>
+            <p className="text-lg font-medium">
+              {emptyStateMessages[folder || "inbox"]?.title || "No emails found"}
+            </p>
             <p className="text-sm">
               {emails.length === 0
-                ? "Connect an email account to get started"
+                ? (folder === "inbox" ? "Connect an email account to get started." : "No emails yet.")
                 : "Try adjusting your filters"}
             </p>
-            {emails.length === 0 && (
+            {emails.length === 0 && folder === "inbox" && (
               <Link href="/connections">
                 <Button className="mt-4" variant="outline">
                   Connect Email
