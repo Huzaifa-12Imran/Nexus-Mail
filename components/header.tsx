@@ -370,7 +370,7 @@ export function Header() {
                 variant="ghost"
                 className="w-full justify-start gap-2 px-4"
                 onClick={() => {
-                  router.push("/connect")
+                  router.push("/settings")
                   setShowUserMenu(false)
                 }}
               >

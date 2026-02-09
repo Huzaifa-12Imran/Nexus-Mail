@@ -531,7 +531,7 @@ export function EmailList({ folder, category }: { folder?: string; category?: st
                 : "Try adjusting your filters"}
             </p>
             {emails.length === 0 && (
-              <Link href="/connect">
+              <Link href="/connections">
                 <Button className="mt-4" variant="outline">
                   Connect Email
                 </Button>

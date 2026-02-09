@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Mail, Plus, Trash2, Loader2, ArrowLeft } from "lucide-react"
+import { Mail, Plus, Trash2, Loader2, ArrowLeft, RefreshCw, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
@@ -115,11 +115,27 @@ export default function ConnectionsPage() {
             </>
           ) : (
             <>
-              <Plus className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Sync Nylas Grants
             </>
           )}
         </Button>
+      </div>
+
+      {/* How Sync Works Section */}
+      <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-500 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-blue-900 mb-2">How the Sync Process Works</h3>
+            <div className="text-sm text-blue-800 space-y-2">
+              <p>1. <strong>Create a Grant ID on Nylas:</strong> Go to your Nylas Dashboard and create a new Grant for the email account you want to connect.</p>
+              <p>2. <strong>Complete OAuth:</strong> Follow the prompts to grant access to your email account.</p>
+              <p>3. <strong>Click Sync:</strong> Press the "Sync Nylas Grants" button to fetch all your Grants from Nylas.</p>
+              <p>4. <strong>View emails:</strong> Once synced, your email accounts will appear here and in your inbox.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {connections.length === 0 ? (
@@ -127,7 +143,7 @@ export default function ConnectionsPage() {
           <Mail className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">No Email Connections</h2>
           <p className="text-muted-foreground mb-4">
-            Add email accounts through the Nylas Dashboard to sync them here.
+            Create a Grant on your Nylas Dashboard, then click the Sync button below to import it.
           </p>
           <Button onClick={handleSync} disabled={syncing}>
             {syncing ? "Syncing..." : "Sync from Nylas"}
