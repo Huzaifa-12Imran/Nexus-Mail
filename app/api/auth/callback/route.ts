@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
 import { prisma } from "@/lib/prisma"
 
 export const dynamic = 'force-dynamic'
@@ -45,13 +45,13 @@ export async function GET(request: Request) {
           where: { id: session.user.id },
           update: {
             email: session.user.email!,
-            name: session.user.user_metadata.full_name,
+            name: session.user.user_metadata.full_name || session.user.user_metadata.name,
             avatarUrl: session.user.user_metadata.avatar_url,
           },
           create: {
             id: session.user.id,
             email: session.user.email!,
-            name: session.user.user_metadata.full_name,
+            name: session.user.user_metadata.full_name || session.user.user_metadata.name,
             avatarUrl: session.user.user_metadata.avatar_url,
           },
         })
@@ -81,8 +81,7 @@ export async function GET(request: Request) {
       }
 
       // Redirect to home page
-      const response = NextResponse.redirect(new URL("/", origin))
-      return response
+      return NextResponse.redirect(new URL("/", origin))
     }
   }
 

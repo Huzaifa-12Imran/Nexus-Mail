@@ -424,3 +424,18 @@ model PrioritySender {
   @@unique([userId, email])
   @@index([userId])
 }
+
+// ============================================================================
+// EMAIL CONFIRMATION
+// ============================================================================
+
+model EmailConfirmation {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}

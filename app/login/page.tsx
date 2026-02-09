@@ -6,10 +6,13 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
 export default function LoginPage() {
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
   const router = useRouter()
   const supabase = createBrowserSupabaseClient()
 
@@ -27,21 +30,65 @@ export default function LoginPage() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setPasswordError("")
 
     try {
       if (isSignUp) {
+        // Validate passwords match
+        if (password !== confirmPassword) {
+          setPasswordError("Passwords do not match")
+          setIsLoading(false)
+          return
+        }
+        
+        // Validate password length
+        if (password.length < 6) {
+          setPasswordError("Password must be at least 6 characters")
+          setIsLoading(false)
+          return
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              name: name,
+            },
+          },
         })
-        if (error) throw error
-        alert("Check your email for confirmation!")
+        
+        if (error) {
+          // Check if user already exists
+          if (error.message.includes("User already registered")) {
+            alert("An account with this email already exists. Please sign in instead.")
+            setIsSignUp(false)
+          } else {
+            alert(error.message)
+          }
+          return
+        }
+        
+        // Show success message and switch to sign in
+        alert("Registration successful! You can now sign in.")
+        setIsSignUp(false)
+        setPassword("")
+        setConfirmPassword("")
+        setName("")
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
-        if (error) throw error
+        
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            alert("Invalid email or password. Please try again.")
+          } else {
+            alert(error.message)
+          }
+          return
+        }
         // Redirect to home on successful login
         router.push("/")
         router.refresh()
@@ -87,6 +134,19 @@ export default function LoginPage() {
         </h1>
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                placeholder="Enter your full name"
+                required={isSignUp}
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
             <input
@@ -94,6 +154,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-input rounded-md bg-background"
+              placeholder="Enter your email"
               required
             />
           </div>
@@ -104,11 +165,28 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-input rounded-md bg-background"
+              placeholder="Enter your password"
               required
             />
           </div>
+          {isSignUp && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                placeholder="Confirm your password"
+                required={isSignUp}
+              />
+            </div>
+          )}
+          {passwordError && (
+            <p className="text-sm text-red-500">{passwordError}</p>
+          )}
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
+            {isLoading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
           </Button>
         </form>
 
@@ -155,11 +233,26 @@ export default function LoginPage() {
           <button
             type="button"
             className="text-primary hover:underline"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setIsSignUp(!isSignUp)
+              setPasswordError("")
+            }}
           >
             {isSignUp ? "Sign In" : "Sign Up"}
           </button>
         </p>
+
+        {!isSignUp && (
+          <p className="text-center text-sm text-muted-foreground mt-2">
+            <button
+              type="button"
+              className="text-primary hover:underline"
+              onClick={() => router.push("/forgot-password")}
+            >
+              Forgot your password?
+            </button>
+          </p>
+        )}
       </div>
     </div>
   )
