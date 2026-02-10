@@ -5,6 +5,7 @@ import { nylasClient } from "@/lib/nylas"
 import { sendEmail as sendResendEmail } from "@/lib/resend"
 import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
 import { upsertEmailVector } from "@/lib/pinecone"
+import { trackRelationship } from "@/lib/relationships"
 
 export async function GET(request: Request) {
   try {
@@ -310,6 +311,25 @@ export async function POST(request: Request) {
           .update({ email_id: sentEmail.id })
           .eq("id", attachmentId)
       }
+    }
+
+    // Update relationship health tracking (direct call)
+    try {
+      const recipients = Array.isArray(to) ? to : to
+      const recipientList = Array.isArray(recipients) ? recipients.join(", ") : recipients
+      
+      await trackRelationship({
+        emailId: sentEmail.id,
+        from: connection.emailAddress,
+        to: recipientList,
+        subject,
+        body: emailBody,
+        direction: 'outbound',
+        sentAt: new Date().toISOString(),
+      }, user.id)
+      console.log('Relationship tracking completed')
+    } catch (relError) {
+      console.error('Relationship tracking error:', relError)
     }
 
     return NextResponse.json({ success: true, email: sentEmail })
