@@ -17,6 +17,9 @@ import {
   Bell,
   User,
   RefreshCw,
+  Calendar,
+  CheckSquare,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -29,6 +32,9 @@ const navigation = [
   { name: "Trash", href: "/trash", icon: Trash2, folder: "trash" },
   { name: "Snoozed", href: "/snoozed", icon: Clock, folder: "snoozed" },
   { name: "Reminders", href: "/reminders", icon: Bell, folder: "" },
+  { name: "Tasks", href: "/tasks", icon: CheckSquare, folder: "" },
+  { name: "Calendar", href: "/calendar", icon: Calendar, folder: "" },
+  { name: "Notes", href: "/notes", icon: FileText, folder: "" },
   { name: "Priority Senders", href: "/priority-senders", icon: User, folder: "" },
   { name: "Connections", href: "/connections", icon: Mail, folder: "" },
 ]

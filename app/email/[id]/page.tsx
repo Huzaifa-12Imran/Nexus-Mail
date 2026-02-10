@@ -2,23 +2,47 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2 } from "lucide-react"
+import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2, Calendar, CheckSquare, FileText, Plus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn, formatDate } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { ComposeModal } from "@/components/compose-modal"
 
+interface ExtractedEvent {
+  title: string
+  description?: string
+  date?: string
+  time?: string
+  location?: string
+  attendees?: string[]
+  isAllDay?: boolean
+}
+
+interface ExtractedTask {
+  taskName: string
+  deadline?: string
+  priority?: "low" | "medium" | "high" | "urgent"
+}
+
+interface ExtractedData {
+  events: ExtractedEvent[]
+  tasks: ExtractedTask[]
+  summary: string
+}
+
 export default function EmailDetailPage() {
   const params = useParams()
   const [email, setEmail] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isStarred, setIsStarred] = useState(false)
-  const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [aiReply, setAiReply] = useState<string | null>(null)
   const [isGeneratingReply, setIsGeneratingReply] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
   const [replyType, setReplyType] = useState<"reply" | "forward">("reply")
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
+  const [showExtractedMenu, setShowExtractedMenu] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -63,28 +87,6 @@ export default function EmailDetailPage() {
     }
   }
 
-  const generateSummary = async () => {
-    if (aiSummary) return
-
-    try {
-      const response = await fetch(`/api/emails/${params.id}/summarize`, {
-        method: "POST",
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAiSummary(data.summary)
-      }
-    } catch (error) {
-      console.error("Error generating summary:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate summary",
-        variant: "destructive",
-      })
-    }
-  }
-
   const generateReply = async (tone: "professional" | "casual" | "brief") => {
     setIsGeneratingReply(true)
     try {
@@ -107,6 +109,139 @@ export default function EmailDetailPage() {
       })
     } finally {
       setIsGeneratingReply(false)
+    }
+  }
+
+  const extractData = async () => {
+    setIsExtracting(true)
+    try {
+      const response = await fetch("/api/extract-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailId: params.id }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setExtractedData(data.data)
+        setShowExtractedMenu(true)
+        toast({
+          title: "Data Extracted",
+          description: `Found ${data.data.events.length} events, ${data.data.tasks.length} tasks`,
+        })
+      } else {
+        throw new Error("Failed to extract data")
+      }
+    } catch (error) {
+      console.error("Error extracting data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to extract data from email",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  const createEvent = async (event: ExtractedEvent) => {
+    try {
+      const response = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailId: params.id,
+          title: event.title,
+          description: event.description,
+          location: event.location,
+          date: event.date,
+          time: event.time,
+          attendees: event.attendees,
+          isAllDay: event.isAllDay,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Event Created",
+          description: `"${event.title}" has been added to your calendar`,
+        })
+        setExtractedData(prev => prev ? {
+          ...prev,
+          events: prev.events.filter(e => e !== event),
+        } : null)
+      }
+    } catch (error) {
+      console.error("Error creating event:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create event",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const createTask = async (task: ExtractedTask) => {
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailId: params.id,
+          title: task.taskName,
+          deadline: task.deadline,
+          priority: task.priority,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Task Created",
+          description: `"${task.taskName}" has been added to your tasks`,
+        })
+        setExtractedData(prev => prev ? {
+          ...prev,
+          tasks: prev.tasks.filter(t => t !== task),
+        } : null)
+      }
+    } catch (error) {
+      console.error("Error creating task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create task",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const saveNote = async () => {
+    if (!extractedData?.summary) return
+
+    try {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailId: params.id,
+          title: `Summary: ${email.subject}`,
+          content: extractedData.summary,
+          tags: ["email-summary"],
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Note Saved",
+          description: "Email summary has been saved to your notes",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving note:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save note",
+        variant: "destructive",
+      })
     }
   }
 
@@ -171,24 +306,120 @@ export default function EmailDetailPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <h1 className="text-2xl font-bold mb-4">{email.subject}</h1>
 
-        {/* AI Summary */}
-        <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <span className="font-medium">AI Summary</span>
-          </div>
-          {aiSummary ? (
-            <p className="text-muted-foreground">{aiSummary}</p>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateSummary}
-            >
-              Generate Summary
-            </Button>
+        {/* Action Buttons */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={extractData}
+            disabled={isExtracting}
+          >
+            {isExtracting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Extract Data
+          </Button>
+          
+          {extractedData && (
+            <>
+              {extractedData.events.length > 0 && (
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createEvent(extractedData.events[0])}
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Add to Calendar
+                    <span className="ml-1 bg-primary/20 px-1.5 py-0.5 rounded text-xs">
+                      {extractedData.events.length}
+                    </span>
+                  </Button>
+                </div>
+              )}
+              
+              {extractedData.tasks.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => createTask(extractedData.tasks[0])}
+                >
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Create Task
+                  <span className="ml-1 bg-primary/20 px-1.5 py-0.5 rounded text-xs">
+                    {extractedData.tasks.length}
+                  </span>
+                </Button>
+              )}
+              
+              {extractedData.summary && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={saveNote}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Save as Note
+                </Button>
+              )}
+            </>
           )}
         </div>
+
+        {/* Extracted Data Preview */}
+        {extractedData && (extractedData.events.length > 0 || extractedData.tasks.length > 0 || extractedData.summary) && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="font-medium">Extracted Information</span>
+            </div>
+            
+            {extractedData.events.length > 0 && (
+              <div className="mb-3">
+                <p className="text-sm font-medium mb-1">Events:</p>
+                {extractedData.events.map((event, idx) => (
+                  <div key={idx} className="text-sm bg-background p-2 rounded mb-1 flex items-center justify-between">
+                    <span>{event.title} - {event.date} {event.time}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => createEvent(event)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {extractedData.tasks.length > 0 && (
+              <div className="mb-3">
+                <p className="text-sm font-medium mb-1">Tasks:</p>
+                {extractedData.tasks.map((task, idx) => (
+                  <div key={idx} className="text-sm bg-background p-2 rounded mb-1 flex items-center justify-between">
+                    <span>{task.taskName} {task.deadline && `(${task.deadline})`}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => createTask(task)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {extractedData.summary && (
+              <div>
+                <p className="text-sm font-medium mb-1">Summary:</p>
+                <p className="text-sm text-muted-foreground">{extractedData.summary}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sender info */}
         <div className="flex items-center gap-3 mb-6">
