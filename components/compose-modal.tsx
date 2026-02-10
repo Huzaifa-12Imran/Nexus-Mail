@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Sparkles, Send, Loader2 } from "lucide-react"
+import { X, Sparkles, Send, Loader2, Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
+import VoiceRecorder from "@/components/VoiceRecorder"
 
 interface ComposeModalProps {
   isOpen: boolean
@@ -35,7 +36,24 @@ export function ComposeModal({
   const [body, setBody] = useState("")
   const [isSending, setIsSending] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
   const { toast } = useToast()
+
+  const handleVoiceComplete = (transcript: string, refinedEmail: string) => {
+    const textToAdd = refinedEmail || transcript
+    setBody((prev) => (prev ? `${prev}\n\n${textToAdd}` : textToAdd))
+    
+    if (refinedEmail.includes("Subject:")) {
+      const subjectMatch = refinedEmail.match(/Subject: (.*)/)
+      if (subjectMatch && subjectMatch[1]) {
+        setSubject(subjectMatch[1])
+        const bodyWithoutSubject = refinedEmail.replace(/Subject: .*\n+/, "").trim()
+        setBody((prev) => (prev ? `${prev}\n\n${bodyWithoutSubject}` : bodyWithoutSubject))
+      }
+    }
+    
+    setShowVoiceRecorder(false)
+  }
 
   useEffect(() => {
     if (replyTo) {
@@ -135,7 +153,6 @@ export function ComposeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-background rounded-lg shadow-lg w-full max-w-2xl m-4 compose-modal">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold">
             {replyTo ? "Reply" : forward ? "Forward" : "New Message"}
@@ -145,37 +162,45 @@ export function ComposeModal({
           </Button>
         </div>
 
-        {/* Compose form */}
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-14">To:</span>
-            <Input
-              placeholder="recipient@example.com"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="flex-1"
+        {showVoiceRecorder ? (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4 text-center">Record Voice Memo</h3>
+            <VoiceRecorder 
+              onComplete={handleVoiceComplete} 
+              onCancel={() => setShowVoiceRecorder(false)} 
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-14">Subject:</span>
-            <Input
-              placeholder="Enter subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="flex-1"
-            />
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground w-14">To:</span>
+              <Input
+                placeholder="recipient@example.com"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground w-14">Subject:</span>
+              <Input
+                placeholder="Enter subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            <div className="border rounded-lg min-h-[200px]">
+              <textarea
+                className="w-full h-full min-h-[200px] p-3 resize-none outline-none"
+                placeholder="Write your message..."
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="border rounded-lg min-h-[200px]">
-            <textarea
-              className="w-full h-full min-h-[200px] p-3 resize-none outline-none"
-              placeholder="Write your message..."
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-            />
-          </div>
-        </div>
+        )}
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-border">
           <div className="flex items-center gap-2">
             <Button onClick={handleSend} disabled={isSending}>
@@ -193,6 +218,10 @@ export function ComposeModal({
                 <Sparkles className="h-4 w-4 mr-2" />
               )}
               AI Assist
+            </Button>
+            <Button variant="outline" onClick={() => setShowVoiceRecorder(true)} disabled={showVoiceRecorder}>
+              <Mic className="h-4 w-4 mr-2" />
+              Voice Input
             </Button>
           </div>
           <Button variant="ghost" onClick={onClose}>

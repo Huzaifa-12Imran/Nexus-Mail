@@ -13,6 +13,8 @@
   },
   "postinstall": "prisma generate",
   "dependencies": {
+    "@deepgram/sdk": "^4.11.3",
+    "@google/generative-ai": "^0.24.1",
     "@huggingface/hub": "^2.8.1",
     "@huggingface/inference": "^4.13.11",
     "@pinecone-database/pinecone": "^7.0.0",
