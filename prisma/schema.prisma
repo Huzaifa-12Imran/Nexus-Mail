@@ -26,6 +26,7 @@ model User {
   snoozedEmails SnoozedEmail[]
   reminders     EmailReminder[]
   prioritySenders PrioritySender[]
+  attachments   Attachment[]
 }
 
 model Account {
@@ -115,6 +116,7 @@ model Email {
   category    Category?        @relation(fields: [categoryId], references: [id])
   labels      EmailLabel[]
   snoozed     SnoozedEmail[]
+  attachments Attachment[]
 }
 
 model Category {
@@ -423,6 +425,58 @@ model PrioritySender {
 
   @@unique([userId, email])
   @@index([userId])
+}
+
+// ============================================================================ //
+// ATTACHMENTS
+// ============================================================================ //
+
+model Attachment {
+  id            String   @id @default(cuid())
+  userId        String
+  emailId       String?
+  
+  // File info
+  filename      String
+  originalName  String
+  fileType      String
+  fileSize      Int
+  mimeType      String
+  
+  // Storage
+  storageUrl    String
+  downloadUrl   String?
+  
+  // AI-extracted metadata
+  extractedText String?  @db.Text // For PDFs, docs, images (OCR)
+  category      String?  // Auto-categorized (Legal, Design, Finance, etc.)
+  tags          String[] // AI-generated tags
+  
+  // Vector embedding for semantic search
+  embedding     Json?    // Vector for similarity search
+  
+  // Duplicate detection
+  fileHash      String?  // MD5/SHA256 hash
+  similarTo     String[] // IDs of similar files
+  isDuplicate   Boolean  @default(false)
+  duplicateOf   String?  // ID of the original file this is duplicate of
+  
+  // Searchable
+  searchText    String?  @db.Text // Combined searchable text
+  
+  // Metadata
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email Email? @relation(fields: [emailId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([emailId])
+  @@index([fileType])
+  @@index([category])
+  @@index([fileHash])
 }
 
 // ============================================================================

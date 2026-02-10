@@ -20,6 +20,7 @@ import {
   Calendar,
   CheckSquare,
   FileText,
+  Paperclip,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -35,6 +36,7 @@ const navigation = [
   { name: "Tasks", href: "/tasks", icon: CheckSquare, folder: "" },
   { name: "Calendar", href: "/calendar", icon: Calendar, folder: "" },
   { name: "Notes", href: "/notes", icon: FileText, folder: "" },
+  { name: "Attachments", href: "/attachments", icon: Paperclip, folder: "" },
   { name: "Priority Senders", href: "/priority-senders", icon: User, folder: "" },
   { name: "Connections", href: "/connections", icon: Mail, folder: "" },
 ]

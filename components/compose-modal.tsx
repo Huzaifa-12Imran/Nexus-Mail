@@ -1,11 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X, Sparkles, Send, Loader2, Mic } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { X, Sparkles, Send, Loader2, Mic, Paperclip, FileX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import VoiceRecorder from "@/components/VoiceRecorder"
+
+interface Attachment {
+  id: string
+  filename: string
+  fileType: string
+  fileSize: number
+  file: File
+}
 
 interface ComposeModalProps {
   isOpen: boolean
@@ -37,6 +45,8 @@ export function ComposeModal({
   const [isSending, setIsSending] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const handleVoiceComplete = (transcript: string, refinedEmail: string) => {
@@ -71,6 +81,13 @@ export function ComposeModal({
       setBody(initialBody)
     }
   }, [replyTo, forward, initialBody])
+
+  // Cleanup attachments when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAttachments([])
+    }
+  }, [isOpen])
 
   const generateAiSuggestion = async () => {
     if (!subject || !body) {
@@ -112,16 +129,29 @@ export function ComposeModal({
 
     setIsSending(true)
     try {
+      // Create FormData for multipart email sending
+      const formData = new FormData()
+      formData.append("to", to)
+      formData.append("subject", subject)
+      formData.append("body", body)
+      
+      if (replyTo?.threadId) {
+        formData.append("threadId", replyTo.threadId)
+      }
+      
+      const connectionId = localStorage.getItem("selectedConnectionId")
+      if (connectionId) {
+        formData.append("connectionId", connectionId)
+      }
+      
+      // Append files
+      for (const att of attachments) {
+        formData.append("files", att.file)
+      }
+
       const response = await fetch("/api/emails", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: to.split(",").map((email) => email.trim()),
-          subject,
-          body,
-          threadId: replyTo?.threadId,
-          connectionId: localStorage.getItem("selectedConnectionId"),
-        }),
+        body: formData,
       })
 
       if (response.ok) {
@@ -132,6 +162,7 @@ export function ComposeModal({
         setTo("")
         setSubject("")
         setBody("")
+        setAttachments([])
         onClose()
       } else {
         throw new Error("Failed to send email")
@@ -145,6 +176,45 @@ export function ComposeModal({
     } finally {
       setIsSending(false)
     }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newAttachments: Attachment[] = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const id = `${Date.now()}-${i}-${file.name}`
+      newAttachments.push({
+        id,
+        filename: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        file,
+      })
+    }
+
+    setAttachments((prev) => [...prev, ...newAttachments])
+    toast({
+      title: "Files attached",
+      description: `${newAttachments.length} file(s) attached.`,
+    })
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((att) => att.id !== id))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   if (!isOpen) return null
@@ -190,6 +260,37 @@ export function ComposeModal({
                 className="flex-1"
               />
             </div>
+            
+            {/* Attachments Section */}
+            {attachments.length > 0 && (
+              <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Attachments ({attachments.length})
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md bg-background border text-sm"
+                    >
+                      <span className="truncate max-w-[200px]">{att.filename}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {formatFileSize(att.fileSize)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={() => removeAttachment(att.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <div className="border rounded-lg min-h-[200px]">
               <textarea
                 className="w-full h-full min-h-[200px] p-3 resize-none outline-none"
@@ -203,6 +304,22 @@ export function ComposeModal({
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-border">
           <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.zip,.rar"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4 mr-2" />
+              Attach
+            </Button>
             <Button onClick={handleSend} disabled={isSending}>
               {isSending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

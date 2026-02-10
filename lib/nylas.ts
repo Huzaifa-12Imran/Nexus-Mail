@@ -241,6 +241,12 @@ export async function sendEmail(grantId: string, email: {
   subject: string
   body: string
   reply_to?: { email: string; name?: string }
+  attachments?: Array<{
+    id: string
+    filename: string
+    contentType: string
+    size: number
+  }>
 }) {
   try {
     const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/messages/send`, {
@@ -257,6 +263,12 @@ export async function sendEmail(grantId: string, email: {
         subject: email.subject,
         body: email.body,
         reply_to: email.reply_to ? [email.reply_to] : undefined,
+        attachments: email.attachments?.map(att => ({
+          id: att.id,
+          filename: att.filename,
+          content_type: att.contentType,
+          size: att.size,
+        })),
       }),
     })
     
@@ -270,6 +282,61 @@ export async function sendEmail(grantId: string, email: {
     return data.data
   } catch (error) {
     console.error('[Nylas] Send email error:', error)
+    throw error
+  }
+}
+
+// Upload attachment to Nylas
+export async function uploadAttachment(grantId: string, file: {
+  filename: string
+  contentType: string
+  size: number
+  data: Buffer | ArrayBuffer
+}) {
+  try {
+    const base64Data = Buffer.isBuffer(file.data) 
+      ? file.data.toString('base64')
+      : Buffer.from(file.data).toString('base64')
+    
+    const response = await fetch(`${NYLAS_API_URL}/v3/grants/${grantId}/attachments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${NYLAS_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        filename: file.filename,
+        content_type: file.contentType,
+        size: file.size,
+        allow_inline: true,
+      }),
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      console.error('[Nylas] Upload attachment error:', data)
+      throw new Error(data.error?.message || 'Failed to upload attachment')
+    }
+    
+    // Upload the actual file data
+    const uploadUrl = data.data.upload_url
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: base64Data,
+      headers: {
+        'Content-Type': file.contentType,
+      },
+    })
+    
+    if (!uploadResponse.ok) {
+      console.error('[Nylas] Upload file data error:', await uploadResponse.text())
+      throw new Error('Failed to upload file data')
+    }
+    
+    return data.data
+  } catch (error) {
+    console.error('[Nylas] Upload attachment error:', error)
     throw error
   }
 }
@@ -383,6 +450,7 @@ export const nylasClient = {
   getEmails,
   getEmail,
   sendEmail,
+  uploadAttachment,
   getFolders,
   getLabels,
   getCalendars,

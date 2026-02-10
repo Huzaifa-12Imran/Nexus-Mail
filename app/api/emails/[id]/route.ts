@@ -22,6 +22,7 @@ export async function GET(
       include: {
         category: true,
         labels: true,
+        attachments: true,
       },
     })
 

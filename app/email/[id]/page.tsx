@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2, Calendar, CheckSquare, FileText, Plus } from "lucide-react"
+import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2, Calendar, CheckSquare, FileText, Plus, Paperclip, Download } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn, formatDate } from "@/lib/utils"
@@ -44,6 +44,12 @@ export default function EmailDetailPage() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [showExtractedMenu, setShowExtractedMenu] = useState(false)
   const { toast } = useToast()
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   useEffect(() => {
     if (params.id) {
@@ -455,6 +461,51 @@ export default function EmailDetailPage() {
         <div className="prose prose-sm max-w-none">
           <div dangerouslySetInnerHTML={{ __html: email.bodyHtml || email.body }} />
         </div>
+
+        {/* Attachments */}
+        {email.attachments && email.attachments.length > 0 && (
+          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Paperclip className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Attachments ({email.attachments.length})</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {email.attachments.map((att: any) => (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-3 p-3 bg-background rounded-lg border"
+                >
+                  <div className="flex-shrink-0">
+                    {att.mimeType?.includes("image") ? (
+                      <img
+                        src="data:image/png;base64,..." 
+                        alt={att.filename}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-primary/10 rounded flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate" title={att.filename}>
+                      {att.filename}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFileSize(att.fileSize)}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={att.storageUrl} download={att.filename}>
+                      <Download className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* AI Reply Suggestions */}
         <div className="mt-8 p-4 border-t border-border">

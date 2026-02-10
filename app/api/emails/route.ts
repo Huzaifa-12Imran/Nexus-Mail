@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import { nylasClient } from "@/lib/nylas"
+import { sendEmail as sendResendEmail } from "@/lib/resend"
 import { generateEmbedding, summarizeEmail, categorizeEmail } from "@/lib/openai"
 import { upsertEmailVector } from "@/lib/pinecone"
 
@@ -149,7 +150,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await request.json()
+    // Check if multipart/form-data (has files) or JSON
+    const contentType = request.headers.get("content-type") || ""
+    let body
+    let attachments: File[] = []
+    
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData()
+      body = {
+        to: formData.get("to") as string,
+        cc: formData.get("cc") as string,
+        bcc: formData.get("bcc") as string,
+        subject: formData.get("subject") as string,
+        body: formData.get("body") as string,
+        threadId: formData.get("threadId") as string,
+        connectionId: formData.get("connectionId") as string,
+      }
+      
+      // Get all files
+      const fileKeys: string[] = []
+      formData.forEach((value, key) => {
+        if (value instanceof File && !fileKeys.includes(key)) {
+          fileKeys.push(key)
+        }
+      })
+      
+      for (const key of fileKeys) {
+        const file = formData.get(key) as File
+        if (file instanceof File) {
+          attachments.push(file)
+        }
+      }
+    } else {
+      body = await request.json()
+    }
+
     const { to, cc, bcc, subject, body: emailBody, threadId, connectionId } = body
 
     // Get user's email connection (use selected connection or first active)
@@ -171,21 +206,87 @@ export async function POST(request: Request) {
     // For Nylas v3, the connection.id IS the grantId
     const grantId = connection.grantId || connection.id
     
-    const result = await nylasClient.sendEmail(grantId, {
-      from: { email: connection.emailAddress },
-      to: Array.isArray(to) ? to.map((e: string) => ({ email: e })) : [{ email: to }],
-      cc: cc ? (Array.isArray(cc) ? cc.map((e: string) => ({ email: e })) : [{ email: cc }]) : undefined,
-      bcc: bcc ? (Array.isArray(bcc) ? bcc.map((e: string) => ({ email: e })) : [{ email: bcc }]) : undefined,
-      subject,
-      body: emailBody,
-    })
+    // Handle attachments - prepare for sending
+    let resendAttachments: Array<{ filename: string; content: string }> = []
+    const attachmentIds: string[] = []
+    
+    if (attachments.length > 0) {
+      for (const file of attachments) {
+        try {
+          const arrayBuffer = await file.arrayBuffer()
+          const buffer = Buffer.from(arrayBuffer)
+          const base64Content = buffer.toString('base64')
+          
+          resendAttachments.push({
+            filename: file.name,
+            content: base64Content,
+          })
+          
+          // Generate unique ID for this attachment
+          const attachmentId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          attachmentIds.push(attachmentId)
+          
+          // Save attachment metadata to Supabase for gallery
+          const { error: supabaseError } = await supabase
+            .from("attachments")
+            .insert({
+              id: attachmentId,
+              user_id: user.id,
+              email_id: undefined, // Will be linked after email is created
+              filename: file.name,
+              original_name: file.name,
+              file_type: file.name.split(".").pop()?.toLowerCase() || "",
+              file_size: file.size,
+              mime_type: file.type,
+              storage_url: `/storage/attachments/${user.id}/${Date.now()}-${file.name}`,
+              extracted_text: `[File: ${file.name}]`,
+              category: getCategory(file.name, file.type),
+              tags: JSON.stringify([]),
+              similar_to: JSON.stringify([]),
+              is_duplicate: false,
+              search_text: `${file.name} ${getCategory(file.name, file.type)}`,
+            })
+          
+          if (supabaseError) {
+            console.error('Error saving attachment to Supabase:', supabaseError)
+          }
+        } catch (error) {
+          console.error('Error processing attachment:', error)
+        }
+      }
+    }
+    
+    // Send email - use Resend for emails with attachments
+    let result: any
+    
+    if (resendAttachments.length > 0 && process.env.RESEND_API_KEY) {
+      // Use Resend for emails with attachments
+      result = await sendResendEmail({
+        to: Array.isArray(to) ? to : [to],
+        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : undefined,
+        subject,
+        html: emailBody.replace(/\n/g, '<br>'),
+        text: emailBody,
+        attachments: resendAttachments,
+      })
+    } else {
+      // Use Nylas for emails without attachments
+      result = await nylasClient.sendEmail(grantId, {
+        from: { email: connection.emailAddress },
+        to: Array.isArray(to) ? to.map((e: string) => ({ email: e })) : [{ email: to }],
+        cc: cc ? (Array.isArray(cc) ? cc.map((e: string) => ({ email: e })) : [{ email: cc }]) : undefined,
+        bcc: bcc ? (Array.isArray(bcc) ? bcc.map((e: string) => ({ email: e })) : [{ email: bcc }]) : undefined,
+        subject,
+        body: emailBody,
+      })
+    }
 
     // Store sent email in database
     const sentEmail = await prisma.email.create({
       data: {
         userId: user.id,
         connectionId: connection.id,
-        messageId: result.id || `sent_${Date.now()}`,
+        messageId: result?.id || `sent_${Date.now()}`,
         threadId: threadId || null,
         from: connection.emailAddress,
         fromEmail: connection.emailAddress,
@@ -201,6 +302,16 @@ export async function POST(request: Request) {
       },
     })
 
+    // Link attachments to the sent email in Supabase
+    if (attachmentIds.length > 0 && sentEmail.id) {
+      for (const attachmentId of attachmentIds) {
+        await supabase
+          .from("attachments")
+          .update({ email_id: sentEmail.id })
+          .eq("id", attachmentId)
+      }
+    }
+
     return NextResponse.json({ success: true, email: sentEmail })
   } catch (error) {
     console.error("Error sending email:", error)
@@ -209,4 +320,19 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
+}
+
+// Helper function to get category
+function getCategory(filename: string, mimeType: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() || ""
+  
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "Image"
+  if (["pdf"].includes(ext)) return "Document"
+  if (["doc", "docx", "txt"].includes(ext)) return "Document"
+  if (["zip", "rar", "7z"].includes(ext)) return "Archive"
+  
+  if (mimeType.includes("image")) return "Image"
+  if (mimeType.includes("pdf")) return "Document"
+  
+  return "Other"
 }
