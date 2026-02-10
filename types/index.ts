@@ -340,3 +340,57 @@ export interface SnoozeEmailRequest {
   snoozeUntil: string
   folder?: 'inbox' | 'primary' | 'social' | 'promotions'
 }
+
+// ============================================================================
+// EMAIL ENERGY BUDGET TYPES
+// ============================================================================
+
+export type EnergyLevel = 1 | 2 | 3
+
+export type EnergyLabel = 'energized' | 'neutral' | 'drained'
+
+export interface EnergyRating {
+  id: string
+  user_id: string
+  email_id: string
+  energy_level: EnergyLevel
+  energy_icon: string
+  energy_label: EnergyLabel
+  subject: string | null
+  sender_email: string | null
+  sender_name: string | null
+  time_of_day: number
+  day_of_week: number
+  is_read: boolean
+  has_attachments: boolean
+  thread_length: number
+  estimated_reading_time: number
+  notes: string | null
+  scheduled_suggestion: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EnergyStats {
+  total_ratings: number
+  energized_count: number
+  neutral_count: number
+  drained_count: number
+  energy_score: number
+}
+
+export interface EnergyPatterns {
+  most_energizing_contacts: { email: string; name: string; count: number; avg_energy: number }[]
+  most_draining_contacts: { email: string; name: string; count: number; avg_energy: number }[]
+  peak_energy_hours: { hour: number; avg_energy: number; count: number }[]
+  drain_hours: { hour: number; avg_energy: number; count: number }[]
+  weekly_pattern: { day: number; label: string; avg_energy: number; count: number }[]
+}
+
+export interface SchedulingSuggestion {
+  suggested_time: string
+  suggested_day: string
+  confidence: number
+  reason: string
+  emails_to_schedule: { email_id: string; subject: string; sender: string }[]
+}

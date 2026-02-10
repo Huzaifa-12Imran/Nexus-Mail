@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2, Calendar, CheckSquare, FileText, Plus, Paperclip, Download } from "lucide-react"
+import { ArrowLeft, Star, Reply, Forward, Sparkles, Loader2, Calendar, CheckSquare, FileText, Plus, Paperclip, Download, Zap } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn, formatDate } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { ComposeModal } from "@/components/compose-modal"
+import { EnergyRatingButtons } from "@/components/EnergyRatingModal"
 
 interface ExtractedEvent {
   title: string
@@ -43,6 +44,7 @@ export default function EmailDetailPage() {
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [showExtractedMenu, setShowExtractedMenu] = useState(false)
+  const [showEnergyRating, setShowEnergyRating] = useState(false)
   const { toast } = useToast()
 
   const formatFileSize = (bytes: number) => {
@@ -372,6 +374,24 @@ export default function EmailDetailPage() {
               )}
             </>
           )}
+        </div>
+
+        {/* Energy Rating Section */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="h-5 w-5 text-yellow-500" />
+            <span className="font-medium">How did this email affect your energy?</span>
+          </div>
+          <EnergyRatingButtons
+            emailId={params.id as string}
+            compact={false}
+            onRated={() => {
+              toast({
+                title: "Energy Rating Saved",
+                description: "Thanks for rating! Check the Energy Budget dashboard for insights.",
+              })
+            }}
+          />
         </div>
 
         {/* Extracted Data Preview */}
